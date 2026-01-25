@@ -1,0 +1,26 @@
+{# 是否是金币车 #}
+{% macro tank_premium_class(is_premium) -%}
+  {% if is_premium == 1 %}premium-tank
+  {% else %}normal-tank
+  {% endif %}
+{%- endmacro %}
+
+{# 坦克类型 class #}
+{% macro tank_type_class(type) -%}
+  {% if type == 'SPG' %}tank-type-spg
+  {% elif type == 'mediumTank' %}tank-type-medium
+  {% elif type == 'AT-SPG' %}tank-type-at-spg
+  {% elif type == 'heavyTank' %}tank-type-heavy
+  {% elif type == 'lightTank' %}tank-type-light
+  {% endif %}
+{%- endmacro %}
+
+{# 战斗力颜色 #}
+{% macro power_class(value) -%}
+  {% if value | int < 800 %}power-red
+  {% elif value | int < 1200 %}power-green
+  {% elif value | int < 1400 %}power-blue
+  {% elif value | int < 1600 %}power-purple
+  {% else %}power-gold
+  {% endif %}
+{%- endmacro %}
