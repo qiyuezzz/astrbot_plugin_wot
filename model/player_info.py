@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional
 
 from data.plugins.astrbot_plugin_wot.model.enum_wot import NationEnum, TankTypeEnum, TankRoleEnum
 
@@ -125,10 +126,10 @@ class TankSummary:
 @dataclass
 class FinalSummary:
     summary_title: str
-    query_time: str
-    last_battle_time:str
-    overall_summary: OverallSummary
-    tank_summary: list[TankSummary]
+    query_time: Optional[str] = None
+    last_battle_time:Optional[str] = None
+    overall_summary: Optional[OverallSummary] = None
+    tank_summary: Optional[list[TankSummary]]=None
 
 @dataclass
 class WotRenderContext:

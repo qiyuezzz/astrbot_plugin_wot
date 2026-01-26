@@ -53,7 +53,7 @@ def read_binding_data(send_id:str) -> str:
         return player_name if player_name else None
     except Exception as e:
         logger.error(f"读取绑定数据失败：{e}")
-        return {}
+        return '读取绑定数据失败'
 
 # 写入绑定数据
 async def write_binding_data(qq_id:str,player_name:str):

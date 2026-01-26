@@ -1,8 +1,10 @@
 import requests
 import json
 
+from astrbot.core import log
 
-def fetch_all_tank_data():
+
+def fetch_all_tank_data() ->str:
     url = "https://wotgame.cn/wotpbe/tankopedia/api/vehicles/by_filters/"
 
     payload = {
@@ -46,8 +48,9 @@ def fetch_all_tank_data():
         with open('data/plugins/astrbot_plugin_wot/static/json/wot_tanks_full.json', 'w', encoding='utf-8') as f:
             json.dump(name_indexed_library, f, ensure_ascii=False, indent=4)
 
-        print(f"成功！已保存 {len(name_indexed_library)} 辆坦克的全字段信息。")
+        log.info(f"成功！已保存 {len(name_indexed_library)} 辆坦克的全字段信息。")
         print(f"包含字段: {', '.join(params[:10])} ... 等共 {len(params)} 个字段")
-
+        return f"更新成功！已保存 {len(name_indexed_library)} 辆坦克的全字段信息。"
     except Exception as e:
         print(f"运行失败: {e}")
+        return '更新失败'

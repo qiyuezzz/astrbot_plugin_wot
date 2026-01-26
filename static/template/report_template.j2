@@ -16,7 +16,7 @@
     }
     @font-face {
       font-family: 'JetBrainsMono-Bold';
-      src: url("../JetBrainsMono-2.304/fonts/ttf/JetBrainsMono-Bold.ttf") format("truetype");
+      src: url("data/plugins/astrbot_plugin_wot/static/font/JetBrainsMono-Bold.ttf") format("truetype");
       font-weight: 700;
       font-style: normal;
       font-display: swap;
@@ -296,11 +296,20 @@
     <div class="module-title">{{ ctx.final_summary.summary_title }}</div>
     <!-- 新增summary-content容器，保证间距统一 -->
     <div class="summary-content">
-      <div class="summary-time">
-        <div>查询时间：{{ ctx.final_summary.query_time }}</div>
-        <div>最后战斗时间：{{ ctx.final_summary.last_battle_time }}</div>
-      </div>
+        {# 只有当 query_time 或 last_battle_time 不为空时才渲染时间栏 #}
+        {% if ctx.final_summary.query_time or ctx.final_summary.last_battle_time %}
+        <div class="summary-time">
+          {% if ctx.final_summary.query_time %}
+            <div>查询时间：{{ ctx.final_summary.query_time }}</div>
+          {% endif %}
+          {% if ctx.final_summary.last_battle_time %}
+            <div>最后战斗时间：{{ ctx.final_summary.last_battle_time }}</div>
+          {% endif %}
+        </div>
+    {% endif %}
 
+    {# 核心判断：如果 overall_summary 为 None，则不渲染汇总表格 #}
+    {% if ctx.final_summary.overall_summary %}
       <table class="table-summary-overall">
         <tr>
           <th>出战等级</th><th>胜率</th><th>效率</th>
@@ -328,7 +337,14 @@
           <td>{{ ctx.final_summary.overall_summary.avg_life_time | wot_time }}</td>
         </tr>
       </table>
-
+    {% else %}
+    {# 可选：在此处增加一个无数据的文字提示 #}
+      <div style="padding: 20px; text-align: center; color: #999;">
+        暂无该时间段内的详细对战记录
+      </div>
+    {% endif %}
+    {# 核心判断：如果 tank_summary 为空或为 None，则不渲染坦克详情列表 #}
+    {% if ctx.final_summary.tank_summary %}
       <table class="table-summary-tank">
         <tr>
           <th>序号</th><th>坦克</th><th>国家</th><th>等级</th><th>类型</th>
@@ -372,6 +388,7 @@
         </tr>
         {% endfor %}
       </table>
+    {% endif %}
     </div>
   </section>
 

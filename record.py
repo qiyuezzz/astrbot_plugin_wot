@@ -36,15 +36,21 @@ def get_arena_list_by_days(player_name: str, days: int = 1) -> list[RecordsBasic
     基于get_arena_page函数，获取最近N天的标准对局战绩
     无页数限制，通过时间戳自动终止翻页
     :param player_name: 玩家名称
-    :param days: 要获取的天数（默认3天）
+    :param days: 要获取的天数（默认1天）
     :return: 符合条件的战绩列表
     """
     # 1. 计算时间阈值：N天前的零点时间戳
     current_time = datetime.now()
-    time_threshold = current_time - timedelta(days=days)
+
+    if days>0:
+        end_timestamp_threshold = int(current_time.timestamp())
+        time_threshold = current_time - timedelta(days=days-1)
+    else:
+        end_timestamp_threshold = int(current_time.replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
+        time_threshold = current_time - timedelta(days=abs(days))
     time_threshold = time_threshold.replace(hour=0, minute=0, second=0, microsecond=0)
     start_timestamp_threshold = int(time_threshold.timestamp())
-    print(f"开始查询【{player_name}】最近{days}天的标准对局，时间阈值：{time_threshold}（戳：{start_timestamp_threshold}）")
+    print(f"开始查询【{player_name}】最近{days}天的标准对局，时间阈值：{time_threshold}（戳：{start_timestamp_threshold}）,截止为{end_timestamp_threshold}")
 
     # 2. 初始化变量
     all_valid_records:list [RecordsBasic] =[]  # 最终结果
@@ -67,13 +73,14 @@ def get_arena_list_by_days(player_name: str, days: int = 1) -> list[RecordsBasic
             # 处理当前页数据
             page_has_valid = False
             for record in page_records:
+                record_timestamp = int(record.start_time)
                 # 去重
                 if record.arena_id in seen_arena_ids:
                     continue
-
+                if end_timestamp_threshold<record_timestamp:
+                    continue
                 # 终止条件2：记录时间超出阈值（数据倒序，后续页更旧）
                 try:
-                    record_timestamp = int(record.start_time)
                     if record_timestamp < start_timestamp_threshold:
                         print(f"第 {page} 页发现超出{days}天的记录，终止查询")
                         stop_flag = True
@@ -167,7 +174,6 @@ def get_detail_record_list(player_name:str,arena_list:list[RecordsBasic]) -> lis
             result = future.result()
             if result:
                 detail_record_list.append(result)
-                print(f"成功同步记录: {result.records_basic.arena_id}")
 
     # 注意：多线程返回是乱序的，最后建议按时间排下序
     detail_record_list.sort(key=lambda x: x.records_basic.start_time, reverse=True)
@@ -292,9 +298,9 @@ def calculate_tank_summary(detail_record_list:list[RecordsDetail]) -> list[TankS
     tank_summary_list.sort(key=lambda x: (x.total_count, x.tank_info.tier), reverse=True)
     return tank_summary_list
 
-def get_final_summary(detail_record_list:list[RecordsDetail]) -> FinalSummary:
+def get_final_summary(detail_record_list:list[RecordsDetail],title:str) -> FinalSummary:
     return FinalSummary(
-        summary_title="两日战绩",
+        summary_title=title,
         query_time=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         last_battle_time=datetime.fromtimestamp(float(detail_record_list[0].records_basic.start_time)).strftime("%Y-%m-%d %H:%M:%S"),
         overall_summary=calculate_overall_summary(detail_record_list),
