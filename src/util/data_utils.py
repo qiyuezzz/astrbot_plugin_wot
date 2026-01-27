@@ -61,15 +61,29 @@ def read_binding_data(send_id:str) -> str | None:
         logger.error(f"读取绑定数据失败：{e}")
         return None
 
-async def write_binding_data(qq_id:str,player_name:str) -> bool:
-    """写入绑定数据"""
-    bind_data = {qq_id: player_name}
+
+async def write_binding_data(qq_id: str, player_name: str) -> bool:
+    """更新绑定数据：如果 Key 存在则覆盖，不存在则追加"""
     try:
+        # 1. 读取现有数据
+        bind_data = {}
+        try:
+            async with aiofiles.open(bing_data_path, "r", encoding="utf-8") as f:
+                content = await f.read()
+                if content.strip():  # 确保文件不为空
+                    bind_data = json.loads(content)
+        except FileNotFoundError:
+            # 文件不存在时，初始化为空字典
+            bind_data = {}
+
+        # 2. 修改数据（如果 qq_id 已存在，会自动覆盖旧的 player_name）
+        bind_data[qq_id] = player_name
+
+        # 3. 将更新后的完整字典写回文件
         async with aiofiles.open(bing_data_path, "w", encoding="utf-8") as f:
             await f.write(json.dumps(bind_data, ensure_ascii=False, indent=4))
         return True
     except Exception as e:
-        logger.error(f"写入绑定数据失败：{e}")
+        logger.error(f"操作绑定数据失败：{e}")
         return False
-
 
