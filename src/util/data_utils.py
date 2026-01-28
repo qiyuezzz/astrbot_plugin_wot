@@ -27,6 +27,11 @@ def clean_number(text, default="0", to_int=False):
     # 3. 根据参数返回类型
     return int(digits) if to_int else digits
 
+def get_player_name(message_str:str):
+    command_bind_prefix = "wot绑定 "
+    player_name = message_str.split(command_bind_prefix, maxsplit=1)[1]
+    return player_name
+
 def get_tank_info_by_name(tank_name) -> Tank:
     with open(tank_info_path, 'r', encoding='utf-8') as f:
         tanks_full_info = json.load(f)

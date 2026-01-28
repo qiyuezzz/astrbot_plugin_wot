@@ -1,59 +1,66 @@
+import requests
+
+
 class BaseConfig:
-    """基础配置父类，存放通用配置"""
-    # 通用超时时间（所有接口共用）
     DEFAULT_TIMEOUT = 10
-    # 通用User-Agent（可被子类覆盖）
-    DEFAULT_USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0 Safari/537.36'
+    DEFAULT_USER_AGENT = (
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+        'Chrome/120.0.0.0 Safari/537.36'
+    )
+
+    # 能力声明（默认全部关闭）
+    use_session: bool = False        # 是否使用 Session
+    need_csrf: bool = False          # 是否自动注入 CSRF
+    warmup_url: str | None = None    # 预热地址（获取 cookie）
+
+    def build_headers(self) -> dict:
+        """统一 Header 构造入口（可覆写）"""
+        return {
+            'User-Agent': self.DEFAULT_USER_AGENT
+        }
+
+    def build_params(self) -> dict | None:
+        """统一 Params 构造入口（可覆写）"""
+        return getattr(self, "params", None)
 
 # 获取玩家统计页面
 class WotBoxStatsConfig(BaseConfig):
     base_url = "https://wotbox.ouj.com/wotbox/index.php"
 
-    # 使用方法或属性确保灵活性
-    @property
-    def headers(self):
-        return {
-            'User-Agent': self.DEFAULT_USER_AGENT,
-            'Referer': "https://wotbox.ouj.com/"
-        }
-
-    # 基础参数
     params = {
         'r': 'default/index',
         'pn': ''
     }
 
-#获取玩家对局列表
-class WotBoxAreanListConfig(BaseConfig):
-    base_url = "https://wotapp.ouj.com/index.php"
-
-    @property
-    def headers(self):
+    def build_headers(self):
         return {
             'User-Agent': self.DEFAULT_USER_AGENT,
             'Referer': "https://wotbox.ouj.com/"
         }
 
-    # 基础参数
-    params = {
-        'r': 'wx/ajaxLoadArenas',
-        'p': '',
-        'pn': ''
-    }
-    # 核心修复：添加copy方法，实现配置深拷贝
-    def copy(self):
-        new_config = WotBoxAreanListConfig()
-        new_config.url = self.base_url
-        # 对params做浅拷贝即可（字典值都是字符串）
-        new_config.params = self.params.copy()
-        return new_config
+#获取玩家对局列表
+class WotBoxAreanListConfig(BaseConfig):
+    base_url = "https://wotapp.ouj.com/index.php"
+
+    def build_params(self):
+        return {
+            'r': 'wx/ajaxLoadArenas',
+            'p': '',
+            'pn': ''
+        }
+
+    def build_headers(self):
+        return {
+            'User-Agent': self.DEFAULT_USER_AGENT,
+            'Referer': "https://wotbox.ouj.com/"
+        }
+
 
 #根据对局id获取对局详细详细信息
 class WotBoxDetailRecordConfig(BaseConfig):
     base_url = "https://wotapp.ouj.com/"
 
-    @property
-    def headers(self):
+    def build_headers(self):
         return {
             'Accept':'*/*',
             'Accept-Encoding':'gzip,deflate,br,zstd',
@@ -70,33 +77,36 @@ class WotBoxDetailRecordConfig(BaseConfig):
             'sec-ch-ua-platform':'"Windows"'
         }
 
-    # 基础参数
+    def build_params(self):
+        return {
+            'r': 'wotboxapi/battledetail',
+            'pn': '',
+            'arena_id': ''
+        }
+
+class WotAccountSearchConfig(BaseConfig):
+    base_url = "https://wotgame.cn/zh-cn/community/accounts/search/"
+
+    use_session = True
+    need_csrf = True
+    warmup_url = "https://wotgame.cn/zh-cn/community/accounts/"
+
     params = {
-        'r': 'wotboxapi/battledetail',
-        'pn': '',
-        'arena_id': ''
+        "name": "",
+        "name_gt": ""
     }
 
-class WotGameConfig(BaseConfig):
-    """WGGames接口配置（军团查询等）"""
-    base_url = "https://wgn.wggames.cn"
-    # 具体接口路径
-    CLAN_SEARCH_PATH = "/clans/wot/search/api/accounts/"
+    def build_headers(self):
+        return {
+            "User-Agent": self.DEFAULT_USER_AGENT,
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "X-Requested-With": "XMLHttpRequest",
+            "Referer": self.warmup_url,
+        }
 
-    @property
-    def full_clan_search_url(self):
-        return f"{self.base_url}{self.CLAN_SEARCH_PATH}"
-
-    # 专属headers（如需自定义可覆盖）
-    HEADERS = {
-        'User-Agent': BaseConfig.DEFAULT_USER_AGENT
-    }
 
 # 实例化配置类，主脚本直接用这个实例
 #盒子接口
 wot_box_config = WotBoxStatsConfig()
 wot_box_records_config = WotBoxAreanListConfig()
 wot_box_detail_record_config = WotBoxDetailRecordConfig()
-
-#官方接口
-wot_game_config = WotGameConfig()

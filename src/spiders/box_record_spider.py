@@ -9,17 +9,18 @@ from astrbot.api import logger
 from data.plugins.astrbot_plugin_wot.src.config.request import wot_box_detail_record_config, wot_box_records_config
 from data.plugins.astrbot_plugin_wot.src.model.report import RecordsBasic, RecordsDetail, Tank, FinalSummary, TankSummary, OverallSummary
 from data.plugins.astrbot_plugin_wot.src.util.data_utils import get_tank_info_by_name
-from data.plugins.astrbot_plugin_wot.src.util.http_client import send_get_request
+from data.plugins.astrbot_plugin_wot.src.util.http_client import HttpClient
 
 
 def _get_arena_page(player_name:str,page_num:int) ->list[RecordsBasic]:
     """获取战绩列表"""
+    client = HttpClient()
     arena_list: list[RecordsBasic] = []
     required_keys = {'arena_id', 'is_win', 'gui_type', 'start_time'}
-    config = wot_box_records_config.copy()  # 拷贝配置防止多线程冲突
-    config.params["pn"] = player_name
-    config.params["p"] = page_num
-    res = send_get_request(config)
+    params = wot_box_records_config.build_params()
+    params["pn"] = player_name
+    params["p"] = page_num
+    res = client.send_get(wot_box_records_config,params)
     res_data = res.json()
     data = res_data['data']['arenas']
     for record in data:
@@ -122,15 +123,17 @@ def get_arena_list_by_days(player_name: str, days: int = 1) -> list[RecordsBasic
 def _get_detail_record_single(player_name:str,arena:RecordsBasic) -> RecordsDetail:
     """单个详情请求的逻辑，封装成函数供线程调用"""
     # 1. 深度拷贝配置，防止线程间干扰
-    config = copy.deepcopy(wot_box_detail_record_config)
-    config.params["pn"] = player_name
-    config.params['arena_id'] = arena.arena_id
-
-    res = send_get_request(config)
+    client = HttpClient()
+    params = wot_box_detail_record_config.build_params()
+    params["pn"] = player_name
+    params['arena_id'] = arena.arena_id
+    res = client.send_get(wot_box_detail_record_config,params)
     raw_response = res.text
+    print(raw_response)
     json_match = re.search(r'\{.*\}', raw_response)
     # 获取对局结果
     data = json.loads(json_match.group())['result']
+    print(data)
     # 获取玩家id
     player_id = int(data['player_id'])
     # 获取玩家阵营所有人数据

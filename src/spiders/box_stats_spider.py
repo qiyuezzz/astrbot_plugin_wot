@@ -2,8 +2,9 @@ import re
 from bs4 import BeautifulSoup
 from data.plugins.astrbot_plugin_wot.src.config.request import wot_box_config
 from data.plugins.astrbot_plugin_wot.src.model.report import FrequentTank, PlayerStats
-from data.plugins.astrbot_plugin_wot.src.util.http_client import send_get_request
 from data.plugins.astrbot_plugin_wot.src.util.data_utils import get_tank_info_by_name, clean_number
+from data.plugins.astrbot_plugin_wot.src.util.http_client import HttpClient
+
 
 def get_player_box_stats(player_name: str) ->tuple[PlayerStats,list[FrequentTank]]:
     """
@@ -32,8 +33,10 @@ def get_player_box_stats(player_name: str) ->tuple[PlayerStats,list[FrequentTank
         'comment':'',
         'radar_data': [],
     }
-    wot_box_config.params['pn']=player_name
-    res = send_get_request(wot_box_config)
+    client = HttpClient()
+    params = wot_box_config.build_params()
+    params['pn']=player_name
+    res = client.send_get(wot_box_config,params)
     soup = BeautifulSoup(res.text, 'html.parser')
     other_info_div = soup.find('div',class_='other-info')
     # 获取效率部分
