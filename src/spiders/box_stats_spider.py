@@ -1,9 +1,9 @@
 import re
 from bs4 import BeautifulSoup
-from data.plugins.astrbot_plugin_wot.src.config.request import wot_box_config
+from data.plugins.astrbot_plugin_wot.src.http.request_context import wot_box_config
 from data.plugins.astrbot_plugin_wot.src.model.report import FrequentTank, PlayerStats
 from data.plugins.astrbot_plugin_wot.src.util.data_utils import get_tank_info_by_name, clean_number
-from data.plugins.astrbot_plugin_wot.src.util.http_client import HttpClient
+from data.plugins.astrbot_plugin_wot.src.http.http_client import HttpClient
 
 
 def get_player_box_stats(player_name: str) ->tuple[PlayerStats,list[FrequentTank]]:

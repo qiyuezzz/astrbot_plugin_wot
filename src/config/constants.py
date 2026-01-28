@@ -1,5 +1,5 @@
 # 玩家和qq绑定数据
-bing_data_path = "data/plugins/astrbot_plugin_wot/resources/static/data/player_name_binding.json"
+bind_data_path = "data/plugins/astrbot_plugin_wot/resources/static/data/player_name_binding.json"
 # 全量坦克信息数据
 tank_info_path = "data/plugins/astrbot_plugin_wot/resources/static/data/wot_tanks_full.json"
 

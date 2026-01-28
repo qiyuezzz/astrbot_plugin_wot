@@ -7,7 +7,8 @@ from astrbot.api import logger
 from data.plugins.astrbot_plugin_wot.src.config.message import WotBindMsg, CheckBindMsg
 from data.plugins.astrbot_plugin_wot.src.config.constants import report_dir_path
 from data.plugins.astrbot_plugin_wot.src.handler.command_handler import get_record_today, get_record_yesterday, \
-    get_record_two_days, get_record_three_days
+    get_record_two_days, get_record_three_days, bind_user_name
+from data.plugins.astrbot_plugin_wot.src.model.player import AccountInfo
 from data.plugins.astrbot_plugin_wot.src.spiders.tank_info_spider import get_all_tank_info
 from data.plugins.astrbot_plugin_wot.src.util.data_utils import write_binding_data, binding_check, get_player_name
 
@@ -53,8 +54,9 @@ class MyPlugin(Star):
         message_chain = event.get_messages()
         player_name = get_player_name(event.message_str)
         logger.info(message_chain)
-        if await write_binding_data(event.get_sender_id(),player_name):
-            msg=WotBindMsg.success(player_name)
+        account_info: AccountInfo | None =  await bind_user_name(event.get_sender_id(), player_name)
+        if account_info:
+            msg=WotBindMsg.success(account_info)
         else:
             msg=WotBindMsg.fail(player_name)
         yield event.plain_result(msg)

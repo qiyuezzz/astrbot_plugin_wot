@@ -1,8 +1,11 @@
+from data.plugins.astrbot_plugin_wot.src.model.player import AccountInfo
+
+
 class WotBindMsg:
     @staticmethod
-    def success(player_name:str):
+    def success(account_info:AccountInfo):
         """绑定成功"""
-        msg=f'绑定成功，玩家名称为"{player_name}"'
+        msg=f'绑定成功，玩家名称为"{account_info.account_name}"\n军团:"{account_info.clan_tag}"\n玩家id:"{account_info.account_id}"'
         return msg
     @staticmethod
     def fail(player_name:str):

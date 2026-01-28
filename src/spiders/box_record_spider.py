@@ -1,4 +1,3 @@
-import copy
 import json
 import re
 from collections import defaultdict
@@ -6,10 +5,10 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from astrbot.api import logger
-from data.plugins.astrbot_plugin_wot.src.config.request import wot_box_detail_record_config, wot_box_records_config
+from data.plugins.astrbot_plugin_wot.src.http.request_context import wot_box_detail_record_config, wot_box_records_config
 from data.plugins.astrbot_plugin_wot.src.model.report import RecordsBasic, RecordsDetail, Tank, FinalSummary, TankSummary, OverallSummary
 from data.plugins.astrbot_plugin_wot.src.util.data_utils import get_tank_info_by_name
-from data.plugins.astrbot_plugin_wot.src.util.http_client import HttpClient
+from data.plugins.astrbot_plugin_wot.src.http.http_client import HttpClient
 
 
 def _get_arena_page(player_name:str,page_num:int) ->list[RecordsBasic]:

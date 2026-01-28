@@ -2,7 +2,7 @@ import json
 import re
 import aiofiles
 from astrbot.api import logger
-from data.plugins.astrbot_plugin_wot.src.config.constants import tank_info_path, bing_data_path
+from data.plugins.astrbot_plugin_wot.src.config.constants import tank_info_path, bind_data_path
 from data.plugins.astrbot_plugin_wot.src.model.enum import TankNationEnum, TankTypeEnum, TankRoleEnum
 from data.plugins.astrbot_plugin_wot.src.model.report import Tank
 
@@ -58,7 +58,7 @@ def binding_check(qq_id:str)->str | None:
 def read_binding_data(send_id:str) -> str | None:
     """读取绑定数据"""
     try:
-        with open(bing_data_path, "r", encoding="utf-8") as f:
+        with open(bind_data_path, "r", encoding="utf-8") as f:
             bind_data = json.load(f)
             player_name = bind_data[send_id]
         return player_name if player_name else None
@@ -73,7 +73,7 @@ async def write_binding_data(qq_id: str, player_name: str) -> bool:
         # 1. 读取现有数据
         bind_data = {}
         try:
-            async with aiofiles.open(bing_data_path, "r", encoding="utf-8") as f:
+            async with aiofiles.open(bind_data_path, "r", encoding="utf-8") as f:
                 content = await f.read()
                 if content.strip():  # 确保文件不为空
                     bind_data = json.loads(content)
@@ -85,7 +85,7 @@ async def write_binding_data(qq_id: str, player_name: str) -> bool:
         bind_data[qq_id] = player_name
 
         # 3. 将更新后的完整字典写回文件
-        async with aiofiles.open(bing_data_path, "w", encoding="utf-8") as f:
+        async with aiofiles.open(bind_data_path, "w", encoding="utf-8") as f:
             await f.write(json.dumps(bind_data, ensure_ascii=False, indent=4))
         return True
     except Exception as e:
