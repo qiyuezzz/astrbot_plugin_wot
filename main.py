@@ -7,10 +7,9 @@ from astrbot.api import logger
 from data.plugins.astrbot_plugin_wot.src.config.message import WotBindMsg, CheckBindMsg
 from data.plugins.astrbot_plugin_wot.src.config.constants import report_dir_path
 from data.plugins.astrbot_plugin_wot.src.handler.command_handler import get_record_today, get_record_yesterday, \
-    get_record_two_days, get_record_three_days, bind_user_name
+    get_record_two_days, get_record_three_days, bind_user_name, update_all_tank_info
 from data.plugins.astrbot_plugin_wot.src.model.player import AccountInfo
-from data.plugins.astrbot_plugin_wot.src.spiders.tank_info_spider import get_all_tank_info
-from data.plugins.astrbot_plugin_wot.src.util.data_utils import write_binding_data, binding_check, get_player_name
+from data.plugins.astrbot_plugin_wot.src.util.data_utils import  binding_check, get_player_name
 
 
 @register("astrbot_plugin_wot", "zzc", "查询坦克世界效率和战绩", "1.0.0")
@@ -131,8 +130,8 @@ class MyPlugin(Star):
         """从官网同步坦克信息"""
         message_chain = event.get_messages()
         logger.info(message_chain)
-        get_all_tank_info()
-        yield event.plain_result("已同步坦克基本信息")
+        result = update_all_tank_info()
+        yield event.plain_result(result)
 
 async def terminate(self):
         """可选择实现异步的插件销毁方法，当插件被卸载/停用时会调用。"""

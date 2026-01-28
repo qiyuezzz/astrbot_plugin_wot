@@ -87,6 +87,28 @@ class WotBoxDetailRecordConfig(BaseConfig):
         }
 
 # 官网接口
+class WotGameTankInfoConfig(BaseConfig):
+    """获取坦克信息"""
+    base_url = "https://wotgame.cn/wotpbe/tankopedia/api/vehicles/by_filters/"
+
+    warmup_url="https://wotgame.cn/zh-cn/tankopedia/"
+
+    data = {
+        "filter[nation]": "ussr,usa,france,germany,uk,japan,czech,sweden,poland,italy,china",
+        "filter[language]": "zh-cn",
+        "filter[premium]": "0,1",
+        "filter[apply_modified_ttc]": "1"
+    }
+
+    def build_headers(self):
+        return {
+            'X-Requested-With': 'XMLHttpRequest',
+            "User-Agent": self.DEFAULT_USER_AGENT,
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "Referer": self.warmup_url,
+        }
+
+
 class WotAccountSearchConfig(BaseConfig):
     """根据玩家名称查询玩家简单信息"""
     base_url = "https://wotgame.cn/zh-cn/community/accounts/search/"
@@ -117,3 +139,4 @@ wot_box_detail_record_config = WotBoxDetailRecordConfig()
 
 #官网接口
 wot_account_search_config = WotAccountSearchConfig()
+wot_game_tank_info_config = WotGameTankInfoConfig()
