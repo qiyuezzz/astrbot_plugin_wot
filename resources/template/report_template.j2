@@ -178,6 +178,10 @@
     .power-purple { color: #b30aec; }
     .power-gold { color: #fd7e14; }
 
+    .power-float-up { color: #198754; }
+    .power-float-down { color: #dc3545; }
+    .power-float-other{ color: #212529}
+
     .tank-type-spg { color: #dc3545; }
     .tank-type-medium { color: #fd7e14; }
     .tank-type-at-spg { color: #0d6efd; }
@@ -224,6 +228,9 @@
           <td>
               <span class="{{ tank_macro.power_class(ctx.player_stats.power) }}">
                   {{ ctx.player_stats.power }}
+              </span>
+              <span class="{{ tank_macro.power_float_class(ctx.player_stats.power_float) }}">
+                  {{ ctx.player_stats.power_float }}
               </span>
           </td>
           <td>{{ ctx.player_stats.update_time }}</td>
@@ -330,7 +337,7 @@
           <td class="highlight-loss">{{ ctx.final_summary.overall_summary.lose_count }}</td>
           <td>{{ ctx.final_summary.overall_summary.draw_count }}</td>
           <td>{{ ctx.final_summary.overall_summary.avg_damage }}</td>
-          <td>{{ ctx.final_summary.overall_summary.avg_total_assist }}</td>
+          <td>{{ ctx.final_summary.overall_summary.avg_assist_total }}</td>
           <td>{{ ctx.final_summary.overall_summary.avg_block }}</td>
           <td>{{ ctx.final_summary.overall_summary.avg_exp }}</td>
           <td>{{ ctx.final_summary.overall_summary.avg_credits }}</td>
@@ -380,7 +387,7 @@
             </span>
         </td>
         <td>{{ tank.avg_damage }}</td>
-        <td>{{ tank.avg_total_assist }}</td>
+        <td>{{ tank.avg_assist_total }}</td>
         <td>{{ tank.avg_block }}</td>
         <td>{{ tank.avg_exp }}</td>
         <td>{{ tank.avg_credits }}</td>

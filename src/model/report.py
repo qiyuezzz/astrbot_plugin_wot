@@ -68,7 +68,7 @@ class RecordsDetail:
     exp:int             #本场经验
     power:int           #本场效率
     death_count:int     #死亡统计
-    damage_dealt:int    #本场伤害
+    damage_dealt:int    #造成伤害
     assist_radio:int    #点亮协助
     assist_track:int    #断带协助
     assist_stun:int     #弹震协助
@@ -84,9 +84,10 @@ class RecordsDetail:
     life_time:int       #存活时间
 
     @property
-    def total_assist(self) -> int:
+    def assist_total(self) -> int:
         """计算总协助：点亮 + 断带 + 弹震"""
-        return self.assist_radio + self.assist_track + self.assist_stun
+        return max(self.assist_radio,self.assist_track, self.assist_stun)
+        # return self.assist_radio + self.assist_track + self.assist_stun
 
 @dataclass
 class OverallSummary:
@@ -99,7 +100,7 @@ class OverallSummary:
     draw_count: int     # 平局场次
     avg_power: float    # 场均效率（所有对局power的平均值）
     avg_damage: float   # 场均伤害（所有对局damage_dealt的平均值）
-    avg_total_assist: float  # 场均总协助（点亮+断带+弹震的总和平均值）
+    avg_assist_total: float  # 场均总协助（点亮+断带+弹震的总和平均值）
     avg_block: float    # 场均抵挡（所有对局blocked的平均值）
     avg_exp: float      # 场均经验（所有对局exp的平均值）
     avg_credits: float  # 场均收益（所有对局credits的平均值）
@@ -117,7 +118,7 @@ class TankSummary:
     draw_count: int    # 该坦克平局场次
     avg_power: float   # 该坦克场均效率
     avg_damage: float  # 该坦克场均伤害
-    avg_total_assist: float  # 该坦克场均总协助
+    avg_assist_total: float  # 该坦克场均总协助
     avg_block: float   # 该坦克场均抵挡
     avg_exp: float     # 该坦克场均经验
     avg_credits: float # 该坦克场均收益

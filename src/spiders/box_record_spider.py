@@ -10,7 +10,6 @@ from data.plugins.astrbot_plugin_wot.src.model.report import RecordsBasic, Recor
 from data.plugins.astrbot_plugin_wot.src.util.data_utils import get_tank_info_by_name
 from data.plugins.astrbot_plugin_wot.src.http.http_client import HttpClient
 
-
 def _get_arena_page(player_name:str,page_num:int) ->list[RecordsBasic]:
     """获取战绩列表"""
     client = HttpClient()
@@ -214,7 +213,7 @@ def _calculate_overall_summary(detail_record_list:list[RecordsDetail]) -> Overal
         sums["power"] += detail_record.power
         sums["damage"] += detail_record.damage_dealt
         sums["blocked"] += detail_record.blocked
-        sums["assist"] += detail_record.total_assist
+        sums["assist"] += detail_record.assist_total
         sums["exp"] += detail_record.exp
         sums["credits"] += detail_record.credits
         sums["life_time"] += detail_record.life_time
@@ -230,7 +229,7 @@ def _calculate_overall_summary(detail_record_list:list[RecordsDetail]) -> Overal
         draw_count= draw_count,
         avg_power=round(sums["power"] / total_count, 2),
         avg_damage=round(sums["damage"] / total_count, 2),
-        avg_total_assist = round(sums["assist"] / total_count, 2),
+        avg_assist_total = round(sums["assist"] / total_count, 2),
         avg_block=round(sums["blocked"] / total_count, 2),
         avg_exp=round(sums["exp"] / total_count, 2),
         avg_credits=round(sums["credits"] / total_count, 2),
@@ -253,7 +252,7 @@ def _calculate_tank_summary(detail_record_list:list[RecordsDetail]) -> list[Tank
         "draw_count": 0,
         "total_power": 0.0,
         "total_damage": 0,
-        "total_assist": 0,
+        "assist_total": 0,
         "total_blocked": 0,
         "total_exp": 0,
         "total_credits": 0.0,
@@ -276,7 +275,7 @@ def _calculate_tank_summary(detail_record_list:list[RecordsDetail]) -> list[Tank
 
         tank_count["total_power"] += detail_record.power
         tank_count["total_damage"] += detail_record.damage_dealt
-        tank_count["total_assist"] += detail_record.total_assist
+        tank_count["assist_total"] += detail_record.assist_total
         tank_count["total_blocked"] += detail_record.blocked
         tank_count["total_exp"] += detail_record.exp
         tank_count["total_credits"] += detail_record.credits
@@ -295,7 +294,7 @@ def _calculate_tank_summary(detail_record_list:list[RecordsDetail]) -> list[Tank
             draw_count=data["draw_count"],
             avg_power=round(data["total_power"] / total_count, 2),
             avg_damage=round(data["total_damage"] / total_count, 2),
-            avg_total_assist=round(data["total_assist"] / total_count, 2),
+            avg_assist_total=round(data["assist_total"] / total_count, 2),
             avg_block=round(data["total_blocked"] / total_count,2),
             avg_exp=round(data["total_exp"] / total_count, 2),
             avg_credits=round(data["total_credits"] / total_count, 2),

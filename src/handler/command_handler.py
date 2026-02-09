@@ -10,7 +10,7 @@ def update_all_tank_info():
 
 async def bind_user_name(send_id:str, msg:str)  -> AccountInfo | None:
     """绑定玩家名称"""
-    return  await account_bind(send_id,msg)
+    return await account_bind(send_id,msg)
 
 def get_record_today(send_id:str):
     """查询今日效率"""

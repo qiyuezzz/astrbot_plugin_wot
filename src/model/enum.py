@@ -42,6 +42,7 @@ class TankTypeEnum(Enum):
     def __init__(self, code,display_name ):
         self.code = code
         self.display_name = display_name
+
     @classmethod
     def from_code(cls, code):
         for member in cls:

@@ -62,6 +62,13 @@ class WotBoxDetailRecordConfig(BaseConfig):
 
     base_url = "https://wotapp.ouj.com/"
 
+    def build_params(self):
+        return {
+            'r': 'wotboxapi/battledetail',
+            'pn': '',
+            'arena_id': ''
+        }
+
     def build_headers(self):
         return {
             'Accept':'*/*',
@@ -79,18 +86,11 @@ class WotBoxDetailRecordConfig(BaseConfig):
             'sec-ch-ua-platform':'"Windows"'
         }
 
-    def build_params(self):
-        return {
-            'r': 'wotboxapi/battledetail',
-            'pn': '',
-            'arena_id': ''
-        }
-
 # 官网接口
 class WotGameTankInfoConfig(BaseConfig):
     """获取坦克信息"""
-    base_url = "https://wotgame.cn/wotpbe/tankopedia/api/vehicles/by_filters/"
 
+    base_url = "https://wotgame.cn/wotpbe/tankopedia/api/vehicles/by_filters/"
     warmup_url="https://wotgame.cn/zh-cn/tankopedia/"
 
     data = {
@@ -111,11 +111,11 @@ class WotGameTankInfoConfig(BaseConfig):
 
 class WotAccountSearchConfig(BaseConfig):
     """根据玩家名称查询玩家简单信息"""
-    base_url = "https://wotgame.cn/zh-cn/community/accounts/search/"
 
+    base_url = "https://wotgame.cn/zh-cn/community/accounts/search/"
+    warmup_url = "https://wotgame.cn/zh-cn/community/accounts/"
     use_session = True
     need_csrf = True
-    warmup_url = "https://wotgame.cn/zh-cn/community/accounts/"
 
     params = {
         "name": "",

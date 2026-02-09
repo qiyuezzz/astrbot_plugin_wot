@@ -7,7 +7,7 @@ from astrbot.api import logger
 from data.plugins.astrbot_plugin_wot.src.config.constants import template_dir_path, template_path, font_path, \
     report_dir_path
 from data.plugins.astrbot_plugin_wot.src.model.report import FinalSummary, WotRenderContext
-from data.plugins.astrbot_plugin_wot.src.spiders.box_stats_spider import get_player_box_stats
+from data.plugins.astrbot_plugin_wot.src.service.box_stats_service import WotBoxService
 from data.plugins.astrbot_plugin_wot.src.spiders.box_record_spider import get_detail_record_list, get_final_summary, \
     get_arena_list_by_days, get_arena_list_by_times
 from data.plugins.astrbot_plugin_wot.src.util.data_utils import read_binding_data
@@ -119,7 +119,8 @@ def _get_report_data_base(send_id: str, title: str, get_arena_list_func, func_pa
             raise ValueError(f"用户{send_id}未绑定玩家名称，无法获取战绩数据")
 
         # 2. 获取玩家基础统计信息
-        player_stats = get_player_box_stats(player_name)
+        wot_box_service = WotBoxService()
+        player_stats = wot_box_service.get_player_stats(player_name)
         if not player_stats or len(player_stats) < 2:
             raise ValueError(f"获取玩家{player_name}基础统计信息失败，返回数据异常")
 

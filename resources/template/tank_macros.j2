@@ -24,3 +24,18 @@
   {% else %}power-gold
   {% endif %}
 {%- endmacro %}
+
+{# 战斗力浮动 专属颜色宏（按符号判断） #}
+{% macro power_float_class(float_value) -%}
+  {# 将数值转为字符串，方便判断开头符号 #}
+  {% set str_value = float_value | string %}
+  {# 判断开头符号 #}
+  {% if str_value.startswith('+') %}
+    power-float-up
+  {% elif str_value.startswith('-') %}
+    power-float-down
+  {% else %}
+    {# 无符号时的默认样式，可根据需求调整 #}
+    power-float-other
+  {% endif %}
+{%- endmacro %}
