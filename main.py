@@ -82,10 +82,14 @@ class MyPlugin(Star):
         send_id = event.get_sender_id()
         message_chain = event.get_messages()
         logger.info(message_chain)
-        get_record_yesterday(send_id)
-        chain = [
-            Comp.At(qq=send_id),  # At 消息发送者
-            Comp.Image.fromFileSystem(f"{report_dir_path}/{send_id}.png"),  # 从本地文件目录发送图片
+        exist_flag = binding_check(send_id)
+        if exist_flag:
+            get_record_yesterday(send_id)
+            res =Comp.Image.fromFileSystem(f"{report_dir_path}/{send_id}.png")
+        else:
+            res =Comp.Plain(CheckBindMsg.failed())
+        chain: list[Union[Comp.At, Comp.Image, Comp.Plain]] = [
+            Comp.At(qq=send_id),res
         ]
         yield event.chain_result(chain)
 
@@ -95,10 +99,14 @@ class MyPlugin(Star):
         send_id = event.get_sender_id()
         message_chain = event.get_messages()
         logger.info(message_chain)
-        get_record_two_days(send_id)
-        chain = [
-            Comp.At(qq=send_id),  # At 消息发送者
-            Comp.Image.fromFileSystem(f"{report_dir_path}/{send_id}.png"),  # 从本地文件目录发送图片
+        exist_flag = binding_check(send_id)
+        if exist_flag:
+            get_record_two_days(send_id)
+            res =Comp.Image.fromFileSystem(f"{report_dir_path}/{send_id}.png")
+        else:
+            res =Comp.Plain(CheckBindMsg.failed())
+        chain: list[Union[Comp.At, Comp.Image, Comp.Plain]] = [
+            Comp.At(qq=send_id),res
         ]
         yield event.chain_result(chain)
 
@@ -109,10 +117,14 @@ class MyPlugin(Star):
         send_id = event.get_sender_id()
         message_chain = event.get_messages()
         logger.info(message_chain)
-        get_record_three_days(send_id)
-        chain = [
-            Comp.At(qq=send_id),  # At 消息发送者
-            Comp.Image.fromFileSystem(f"{report_dir_path}/{send_id}.png"),  # 从本地文件目录发送图片
+        exist_flag = binding_check(send_id)
+        if exist_flag:
+            get_record_three_days(send_id)
+            res =Comp.Image.fromFileSystem(f"{report_dir_path}/{send_id}.png")
+        else:
+            res =Comp.Plain(CheckBindMsg.failed())
+        chain: list[Union[Comp.At, Comp.Image, Comp.Plain]] = [
+            Comp.At(qq=send_id),res
         ]
         yield event.chain_result(chain)
 

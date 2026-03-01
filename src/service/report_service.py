@@ -7,36 +7,76 @@ from astrbot.api import logger
 from data.plugins.astrbot_plugin_wot.src.config.constants import template_dir_path, template_path, font_path, \
     report_dir_path
 from data.plugins.astrbot_plugin_wot.src.model.report import FinalSummary, WotRenderContext
+from data.plugins.astrbot_plugin_wot.src.service.box_record_service import get_detail_record_list, get_final_summary
 from data.plugins.astrbot_plugin_wot.src.service.box_stats_service import WotBoxService
-from data.plugins.astrbot_plugin_wot.src.spiders.box_record_spider import get_detail_record_list, get_final_summary, \
-    get_arena_list_by_days, get_arena_list_by_times
+from data.plugins.astrbot_plugin_wot.src.spiders.box_record_spider import get_arena_list_by_days, get_arena_list_by_times
 from data.plugins.astrbot_plugin_wot.src.util.data_utils import read_binding_data
 
-def _format_wot_time(seconds):
-    """
-    将秒数格式化为分秒格式的时间字符串
-    :param: seconds (float/int/None): 秒数，可以为数字类型或None/空值
-    :return: 格式化后的时间字符串，格式为"X分XX秒"，如果输入为空则返回'0分0秒'
-    """
-    if not seconds: return "0分0秒"
-    # 计算分钟和秒数
-    m, s = divmod(round(float(seconds)), 60)
-    return f"{m}分{s:02d}秒"
+def get_report_data_by_days(send_id: str, days: int, title: str):
+    """根据玩家名称按天数获取数据"""
+    return _get_report_data_base(
+        send_id=send_id,
+        title=title,
+        get_arena_list_func=get_arena_list_by_days,
+        func_param=days
+    )
 
 
-def _format_win_rate(win_rate: float | None) -> str:
-    """
-    胜率格式化过滤器：忽略末尾0，添加%符号
-    :param win_rate: 原始胜率（float/None）
-    :return: 格式化后的字符串（如60%、62.1%、66.67%）
-    """
-    # 容错：空值/0值处理
-    if win_rate is None or win_rate == 0:
-        return "0%"
+def get_report_data_by_times(send_id: str, times: int, title: str):
+    """根据玩家名称按场次获取数据"""
+    return _get_report_data_base(
+        send_id=send_id,
+        title=title,
+        get_arena_list_func=get_arena_list_by_times,
+        func_param=times
+    )
 
-    # 核心逻辑：保留2位小数 → 去掉末尾0 → 去掉多余小数点 → 加%
-    formatted = f"{win_rate:.2f}".rstrip('0').rstrip('.')
-    return f"{formatted}%"
+def _get_report_data_base(send_id: str, title: str, get_arena_list_func, func_param: int):
+    """
+    战绩报告数据获取通用核心函数（内部函数）
+    :param send_id: 用户ID
+    :param title: 报告标题
+    :param get_arena_list_func: 获取对局列表的函数（get_arena_list_by_days/get_arena_list_by_times）
+    :param func_param: 传给获取对局列表函数的参数（天数/场次）
+    :return: WotRenderContext 渲染上下文
+    """
+    try:
+        # 1. 读取绑定的玩家名称
+        player_name = read_binding_data(send_id)
+        if not player_name:
+            raise ValueError(f"用户{send_id}未绑定玩家名称，无法获取战绩数据")
+
+        # 2. 获取玩家基础统计信息
+        wot_box_service = WotBoxService()
+        player_stats = wot_box_service.get_player_stats(player_name)
+        if not player_stats or len(player_stats) < 2:
+            raise ValueError(f"获取玩家{player_name}基础统计信息失败，返回数据异常")
+
+        # 3. 获取对局列表（按天数/场次，由传入的函数决定）
+        arena_list = get_arena_list_func(player_name, func_param)
+
+        # 4. 处理对局数据并生成汇总
+        if arena_list:
+            detail_arena_list = get_detail_record_list(player_name, arena_list)
+            final_summary = get_final_summary(detail_arena_list, title)
+        else:
+            logger.warning(f"玩家{player_name}未查询到{title}对应的对局数据")
+            final_summary = FinalSummary(summary_title=title)
+
+        # 5. 构建渲染上下文
+        wot_render_context = WotRenderContext(
+            player_stats=player_stats[0],
+            frequent_tank=player_stats[1],
+            final_summary=final_summary
+        )
+        logger.info(f"成功生成{title}渲染上下文：{wot_render_context}")
+
+        # 6. 生成报告
+        _generate_report(send_id, wot_render_context)
+
+    except Exception as e:
+        logger.error(f"获取{title}数据失败（用户{send_id}）：{str(e)}", exc_info=True)
+        raise  # 抛出异常让上层处理，也可注释掉仅记录日志
 
 
 def _generate_report(send_id: str, wot_render_context: WotRenderContext, report_path=None):
@@ -102,72 +142,27 @@ def _generate_report(send_id: str, wot_render_context: WotRenderContext, report_
     png_file_path = report_dir / png_file_name
     logger.info(f"PNG报告生成成功：{png_file_path}")
 
-
-def _get_report_data_base(send_id: str, title: str, get_arena_list_func, func_param: int):
+def _format_wot_time(seconds):
     """
-    战绩报告数据获取通用核心函数（内部函数）
-    :param send_id: 用户ID
-    :param title: 报告标题
-    :param get_arena_list_func: 获取对局列表的函数（get_arena_list_by_days/get_arena_list_by_times）
-    :param func_param: 传给获取对局列表函数的参数（天数/场次）
-    :return: WotRenderContext 渲染上下文
+    将秒数格式化为分秒格式的时间字符串
+    :param: seconds (float/int/None): 秒数，可以为数字类型或None/空值
+    :return: 格式化后的时间字符串，格式为"X分XX秒"，如果输入为空则返回'0分0秒'
     """
-    try:
-        # 1. 读取绑定的玩家名称
-        player_name = read_binding_data(send_id)
-        if not player_name:
-            raise ValueError(f"用户{send_id}未绑定玩家名称，无法获取战绩数据")
+    if not seconds: return "0分0秒"
+    # 计算分钟和秒数
+    m, s = divmod(round(float(seconds)), 60)
+    return f"{m}分{s:02d}秒"
 
-        # 2. 获取玩家基础统计信息
-        wot_box_service = WotBoxService()
-        player_stats = wot_box_service.get_player_stats(player_name)
-        if not player_stats or len(player_stats) < 2:
-            raise ValueError(f"获取玩家{player_name}基础统计信息失败，返回数据异常")
+def _format_win_rate(win_rate: float | None) -> str:
+    """
+    胜率格式化过滤器：忽略末尾0，添加%符号
+    :param win_rate: 原始胜率（float/None）
+    :return: 格式化后的字符串（如60%、62.1%、66.67%）
+    """
+    # 容错：空值/0值处理
+    if win_rate is None or win_rate == 0:
+        return "0%"
 
-        # 3. 获取对局列表（按天数/场次，由传入的函数决定）
-        arena_list = get_arena_list_func(player_name, func_param)
-
-        # 4. 处理对局数据并生成汇总
-        if arena_list:
-            detail_arena_list = get_detail_record_list(player_name, arena_list)
-            final_summary = get_final_summary(detail_arena_list, title)
-        else:
-            logger.warning(f"玩家{player_name}未查询到{title}对应的对局数据")
-            final_summary = FinalSummary(summary_title=title)
-
-        # 5. 构建渲染上下文
-        wot_render_context = WotRenderContext(
-            player_stats=player_stats[0],
-            frequent_tank=player_stats[1],
-            final_summary=final_summary
-        )
-        logger.info(f"成功生成{title}渲染上下文：{wot_render_context}")
-
-        # 6. 生成报告
-        _generate_report(send_id, wot_render_context)
-
-
-    except Exception as e:
-        logger.error(f"获取{title}数据失败（用户{send_id}）：{str(e)}", exc_info=True)
-        raise  # 抛出异常让上层处理，也可注释掉仅记录日志
-
-def get_report_data_by_days(send_id: str, days: int, title: str):
-    """根据玩家名称按天数获取数据"""
-    return _get_report_data_base(
-        send_id=send_id,
-        title=title,
-        get_arena_list_func=get_arena_list_by_days,
-        func_param=days
-    )
-
-
-def get_report_data_by_times(send_id: str, times: int, title: str):
-    """根据玩家名称按场次获取数据"""
-    return _get_report_data_base(
-        send_id=send_id,
-        title=title,
-        get_arena_list_func=get_arena_list_by_times,
-        func_param=times
-    )
-
-
+    # 核心逻辑：保留2位小数 → 去掉末尾0 → 去掉多余小数点 → 加%
+    formatted = f"{win_rate:.2f}".rstrip('0').rstrip('.')
+    return f"{formatted}%"

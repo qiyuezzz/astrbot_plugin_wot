@@ -1,7 +1,6 @@
 from data.plugins.astrbot_plugin_wot.src.model.player import AccountInfo
-from data.plugins.astrbot_plugin_wot.src.service.account_service import account_bind
 from data.plugins.astrbot_plugin_wot.src.service.report_service import get_report_data_by_days
-from data.plugins.astrbot_plugin_wot.src.service.wot_data_service import update_tank_info
+from data.plugins.astrbot_plugin_wot.src.service.wot_data_service import update_tank_info, account_bind
 
 
 def update_all_tank_info():
