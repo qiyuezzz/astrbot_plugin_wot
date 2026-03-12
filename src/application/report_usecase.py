@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from html2image import Html2Image
-from jinja2 import FileSystemLoader, Environment
+from jinja2 import Environment, FileSystemLoader
 
 from astrbot.api import logger
 from data.plugins.astrbot_plugin_wot.src.config.constants import (
@@ -10,55 +10,103 @@ from data.plugins.astrbot_plugin_wot.src.config.constants import (
     template_dir_path,
     template_path,
 )
-from data.plugins.astrbot_plugin_wot.src.domain.models.report import FinalSummary, WotRenderContext
-from data.plugins.astrbot_plugin_wot.src.infrastructure.storage.bindings_repo import read_binding_data
-from data.plugins.astrbot_plugin_wot.src.services.player_stats_service import WotBoxService
+from data.plugins.astrbot_plugin_wot.src.domain.models.report import (
+    FinalSummary,
+    WotRenderContext,
+)
+from data.plugins.astrbot_plugin_wot.src.infrastructure.storage.bindings_repo import (
+    read_binding_data,
+)
+from data.plugins.astrbot_plugin_wot.src.services.player_stats_service import (
+    WotBoxService,
+)
 from data.plugins.astrbot_plugin_wot.src.services.record_query_service import (
     get_arena_list_by_days,
     get_arena_list_by_times,
 )
-from data.plugins.astrbot_plugin_wot.src.services.report_builder import get_detail_record_list, get_final_summary
+from data.plugins.astrbot_plugin_wot.src.services.report_builder import (
+    get_detail_record_list,
+    get_final_summary,
+)
 
-def get_report_data_by_days(send_id: str, days: int, title: str):
+
+def get_report_data_by_days(
+    send_id: str,
+    days: int,
+    title: str,
+    player_name_override: str | None = None,
+):
     """根据玩家名称按天数获取数据"""
     return _get_report_data_base(
         send_id=send_id,
         title=title,
         get_arena_list_func=get_arena_list_by_days,
-        func_param=days
+        func_param=days,
+        player_name_override=player_name_override,
     )
 
 
-def get_report_data_by_times(send_id: str, times: int, title: str):
+def get_report_data_by_times(
+    send_id: str,
+    times: int,
+    title: str,
+    player_name_override: str | None = None,
+):
     """根据玩家名称按场次获取数据"""
     return _get_report_data_base(
         send_id=send_id,
         title=title,
         get_arena_list_func=get_arena_list_by_times,
-        func_param=times
+        func_param=times,
+        player_name_override=player_name_override,
     )
 
 
-def get_record_today(send_id: str):
+def get_record_today(send_id: str, player_name_override: str | None = None):
     """查询今日效率"""
-    get_report_data_by_days(send_id, 1, title="今日战绩")
+    get_report_data_by_days(
+        send_id, 1, title="今日战绩", player_name_override=player_name_override
+    )
 
 
-def get_record_yesterday(send_id: str):
+def get_record_yesterday(send_id: str, player_name_override: str | None = None):
     """查询昨日效率"""
-    get_report_data_by_days(send_id, -1, title="昨日战绩")
+    get_report_data_by_days(
+        send_id, -1, title="昨日战绩", player_name_override=player_name_override
+    )
 
 
-def get_record_two_days(send_id: str):
+def get_record_two_days(send_id: str, player_name_override: str | None = None):
     """查询两日效率"""
-    get_report_data_by_days(send_id, 2, title="两日战绩")
+    get_report_data_by_days(
+        send_id, 2, title="两日战绩", player_name_override=player_name_override
+    )
 
 
-def get_record_three_days(send_id: str):
+def get_record_three_days(send_id: str, player_name_override: str | None = None):
     """查询三日效率"""
-    get_report_data_by_days(send_id, 3, title="三日战绩")
+    get_report_data_by_days(
+        send_id, 3, title="三日战绩", player_name_override=player_name_override
+    )
 
-def _get_report_data_base(send_id: str, title: str, get_arena_list_func, func_param: int):
+
+def get_record_hundred(send_id: str, player_name_override: str | None = None):
+    """查询百场效率"""
+    get_report_data_by_times(
+        send_id,
+        100,
+        title="百场战绩",
+        player_name_override=player_name_override,
+    )
+
+
+def _get_report_data_base(
+    send_id: str,
+    title: str,
+    get_arena_list_func,
+    func_param: int,
+    player_name_override: str | None = None,
+):
     """
     战绩报告数据获取通用核心函数（内部函数）
     :param send_id: 用户ID
@@ -69,7 +117,7 @@ def _get_report_data_base(send_id: str, title: str, get_arena_list_func, func_pa
     """
     try:
         # 1. 读取绑定的玩家名称
-        player_name = read_binding_data(send_id)
+        player_name = player_name_override or read_binding_data(send_id)
         if not player_name:
             raise ValueError(f"用户{send_id}未绑定玩家名称，无法获取战绩数据")
 
@@ -85,7 +133,11 @@ def _get_report_data_base(send_id: str, title: str, get_arena_list_func, func_pa
         # 4. 处理对局数据并生成汇总
         if arena_list:
             detail_arena_list = get_detail_record_list(player_name, arena_list)
-            final_summary = get_final_summary(detail_arena_list, title)
+            if detail_arena_list:
+                final_summary = get_final_summary(detail_arena_list, title)
+            else:
+                logger.warning(f"玩家{player_name}未查询到{title}对应的详细对局数据")
+                final_summary = FinalSummary(summary_title=title)
         else:
             logger.warning(f"玩家{player_name}未查询到{title}对应的对局数据")
             final_summary = FinalSummary(summary_title=title)
@@ -94,7 +146,7 @@ def _get_report_data_base(send_id: str, title: str, get_arena_list_func, func_pa
         wot_render_context = WotRenderContext(
             player_stats=player_stats[0],
             frequent_tank=player_stats[1],
-            final_summary=final_summary
+            final_summary=final_summary,
         )
         logger.info(f"成功生成{title}渲染上下文：{wot_render_context}")
 
@@ -106,7 +158,9 @@ def _get_report_data_base(send_id: str, title: str, get_arena_list_func, func_pa
         raise  # 抛出异常让上层处理，也可注释掉仅记录日志
 
 
-def _generate_report(send_id: str, wot_render_context: WotRenderContext, report_path=None):
+def _generate_report(
+    send_id: str, wot_render_context: WotRenderContext, report_path=None
+):
     """
     生成WOT战绩报告
     :param send_id: 用户ID（用于命名报告文件）
@@ -132,11 +186,11 @@ def _generate_report(send_id: str, wot_render_context: WotRenderContext, report_
         loader=FileSystemLoader(str(template_dir)),  # 传入模板目录路径
         autoescape=False,
         trim_blocks=True,  # 清理模板多余空格
-        lstrip_blocks=True
+        lstrip_blocks=True,
     )
     # 注册自定义过滤器
-    env.filters['wot_time'] = _format_wot_time
-    env.filters['win_rate'] = _format_win_rate
+    env.filters["wot_time"] = _format_wot_time
+    env.filters["win_rate"] = _format_win_rate
 
     # ========== 4. 加载模板并渲染HTML ==========
     # 仅传入模板文件名（核心修复：不再传完整路径）
@@ -144,30 +198,28 @@ def _generate_report(send_id: str, wot_render_context: WotRenderContext, report_
     # 渲染模板（传入上下文+字体文件绝对路径）
     html_output = template.render(
         ctx=wot_render_context,
-        font_url=str(font_file)  # 传入字体绝对路径，避免相对路径问题
+        font_url=str(font_file),  # 传入字体绝对路径，避免相对路径问题
     )
 
     # ========== 5. 保存HTML文件 ==========
     html_file_path = report_dir / f"{send_id}.html"
-    with open(html_file_path, 'w', encoding='utf-8') as f:
+    with open(html_file_path, "w", encoding="utf-8") as f:
         f.write(html_output)
     logger.info(f"HTML文件已保存：{html_file_path}")
 
     # ========== 6. 转换HTML为PNG图片 ==========
     # 初始化Html2Image（指定输出目录为绝对路径）
     hti = Html2Image(
-        output_path=str(report_dir),
-        custom_flags=['--no-sandbox', '--disable-gpu']
+        output_path=str(report_dir), custom_flags=["--no-sandbox", "--disable-gpu"]
     )
     # 生成PNG（size建议用元组，避免解析问题）
     png_file_name = f"{send_id}.png"
     hti.screenshot(
-        html_file=str(html_file_path),
-        save_as=png_file_name,
-        size=(2560, 2800)
+        html_file=str(html_file_path), save_as=png_file_name, size=(2560, 2800)
     )
     png_file_path = report_dir / png_file_name
     logger.info(f"PNG报告生成成功：{png_file_path}")
+
 
 def _format_wot_time(seconds):
     """
@@ -175,10 +227,12 @@ def _format_wot_time(seconds):
     :param: seconds (float/int/None): 秒数，可以为数字类型或None/空值
     :return: 格式化后的时间字符串，格式为"X分XX秒"，如果输入为空则返回'0分0秒'
     """
-    if not seconds: return "0分0秒"
+    if not seconds:
+        return "0分0秒"
     # 计算分钟和秒数
     m, s = divmod(round(float(seconds)), 60)
     return f"{m}分{s:02d}秒"
+
 
 def _format_win_rate(win_rate: float | None) -> str:
     """
@@ -191,5 +245,5 @@ def _format_win_rate(win_rate: float | None) -> str:
         return "0%"
 
     # 核心逻辑：保留2位小数 → 去掉末尾0 → 去掉多余小数点 → 加%
-    formatted = f"{win_rate:.2f}".rstrip('0').rstrip('.')
+    formatted = f"{win_rate:.2f}".rstrip("0").rstrip(".")
     return f"{formatted}%"

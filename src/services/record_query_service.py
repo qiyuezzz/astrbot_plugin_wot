@@ -16,8 +16,45 @@ from data.plugins.astrbot_plugin_wot.src.infrastructure.parsers.wot_box_records 
 
 
 def get_arena_list_by_times(player_name: str, times: int) -> list[RecordsBasic]:
-    """Get latest N standard battles. Not implemented."""
-    return []
+    """Get latest N standard battles."""
+    if times <= 0:
+        return []
+
+    all_valid_records: list[RecordsBasic] = []
+    seen_arena_ids = set()
+    page = 1
+
+    while len(all_valid_records) < times:
+        try:
+            raw_json = fetch_arena_page(player_name, page)
+            page_records = parse_arena_list(raw_json)
+            if not page_records:
+                break
+
+            page_has_new = False
+            for record in page_records:
+                if record.arena_id in seen_arena_ids:
+                    continue
+                all_valid_records.append(record)
+                seen_arena_ids.add(record.arena_id)
+                page_has_new = True
+                if len(all_valid_records) >= times:
+                    break
+
+            if not page_has_new:
+                break
+            page += 1
+            time.sleep(0.2)
+        except Exception as exc:
+            logger.error(f"Failed to fetch page {page}: {exc}")
+            if page > 2:
+                break
+            page += 1
+            time.sleep(0.5)
+            continue
+
+    all_valid_records.sort(key=lambda x: int(x.start_time), reverse=True)
+    return all_valid_records[:times]
 
 
 def get_arena_list_by_days(player_name: str, days: int = 1) -> list[RecordsBasic]:

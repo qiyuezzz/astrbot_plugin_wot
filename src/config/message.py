@@ -12,6 +12,10 @@ class WotBindMsg:
         """绑定失败"""
         msg = f'绑定失败，玩家{player_name}不存在 \n请检查玩家名称是否正确'
         return msg
+    @staticmethod
+    def invalid():
+        """绑定参数缺失"""
+        return "绑定失败，缺少玩家名称\n绑定方式：'/wot绑定 玩家名称'"
 
 #校验是否绑定游戏内名称
 class CheckBindMsg:

@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from astrbot.core.utils.path_utils import get_astrbot_data_path
+from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 
 PLUGIN_DIR = Path(get_astrbot_data_path()) / "plugins" / "astrbot_plugin_wot"
 RESOURCES_DIR = PLUGIN_DIR / "resources"

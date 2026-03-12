@@ -5,6 +5,7 @@ class TankNationEnum(Enum):
     """坦克系别枚举"""
     # 格式：常量名 = ("JSON中的原始值", "中文显示名")
 
+    UNKNOWN = ("", "未知")
     USSR = ("ussr","苏联")
     USA = ("usa","美国")
     FRANCE = ("france","法国")
@@ -26,13 +27,14 @@ class TankNationEnum(Enum):
         for member in cls:
             if member.code == code:
                 return member
-        raise ValueError(f"未找到代码为 {code} 的系别")
+        return cls.UNKNOWN
 
 @unique
 class TankTypeEnum(Enum):
     """坦克类型枚举"""
     # 格式：常量名 = ("JSON中的原始值", "中文显示名")
 
+    UNKNOWN = ("", "未知")
     MEDIUM_TANK = ("mediumTank","中坦")
     HEAVY_TANK = ("heavyTank","重坦")
     LIGHT_TANK = ("lightTank","轻坦")
@@ -48,7 +50,7 @@ class TankTypeEnum(Enum):
         for member in cls:
             if member.code == code:
                 return member
-        raise ValueError(f"未找到代码为 {code} 的类型")
+        return cls.UNKNOWN
 
 @unique
 class TankRoleEnum(Enum):
@@ -92,4 +94,4 @@ class TankRoleEnum(Enum):
         for member in cls:
             if member.code == code:
                 return member
-        raise ValueError(f"未找到代码为 {code} 的定位")
+        return cls.NONE
