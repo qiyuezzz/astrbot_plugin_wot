@@ -1,4 +1,4 @@
-from data.plugins.astrbot_plugin_wot.src.model.player import AccountInfo
+from data.plugins.astrbot_plugin_wot.src.domain.models.player import AccountInfo
 
 
 class WotBindMsg:
