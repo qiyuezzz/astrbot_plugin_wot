@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>玩家数据面板</title>
+  <style>
+    /* =========================
+       基础重置 & 全局
+    ========================== */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    @font-face {
+      font-family: 'SourceHanSansSC';
+      src: url('/home/zzc/Projects/PycharmProjects/AstrBot/data/plugins/astrbot_plugin_wot/resources/static/font/SourceHanSansSC-Medium.otf') format("truetype");
+      font-weight: 500;
+      font-style: normal;
+      font-display: swap;
+    }
+    body {
+      background: #f1f3f5;
+      font-family: 'SourceHanSansSC', "Microsoft YaHei", sans-serif;
+      font-size: 33px;
+      font-weight: 500;
+      color: #1a1e22;
+      padding: 20px;
+      line-height: 1.4;
+      text-shadow: 0 0 1px rgba(0,0,0,0.1);
+    }
+
+    .container {
+      max-width: 2560px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow:
+        0 10px 40px rgba(0, 0, 0, 0.08),
+        0 2px 8px rgba(0, 0, 0, 0.05);
+      border: 1px solid #e9ecef;
+    }
+
+    /* =========================
+       模块结构
+    ========================== */
+    .module {
+      margin-bottom: 32px;
+      border-radius: 12px;
+      background: #ffffff;
+      box-shadow: 0 3px 15px rgba(0,0,0,.04);
+      overflow: hidden;
+    }
+
+    .module-title {
+      text-align: center;
+      font-size: 1.4em;
+      padding: 16px;
+      background: linear-gradient(180deg, #495057 0%, #343a40 100%);
+      color: #ffffff;
+      margin-bottom: 0;
+      border-bottom: 1px solid #dee2e6;
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+
+    /* =========================
+       表格基础（核心调整：增大行高，优化对齐）
+    ========================== */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* 调整表头高度：上下padding从4px→12px，更宽松 */
+    table th {
+      background: linear-gradient(180deg, #e9ecef 0%, #f8f9fa 100%);
+      padding: 12px 4px; /* 关键：增大上下内边距，提升表头高度 */
+      border: 1px solid #dee2e6;
+      text-align: center;
+      font-size: 1em;
+      font-weight: 500;
+      color: #1a1e22;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* 调整内容高度：上下padding从4px→10px，和表头匹配 */
+    table td {
+      padding: 10px 2px; /* 关键：增大上下内边距，提升内容行高 */
+      border: 1px solid #e9ecef;
+      text-align: center;
+      font-size: 1em;
+      font-weight: 500;
+      color: #1a1e22;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    table tr:nth-child(even) {
+      background: #fafbfc;
+    }
+
+    table tr:hover {
+      background: #eef2f7;
+    }
+
+    /* =========================
+       表格类型区分（统一字号，避免混乱）
+    ========================== */
+    .table-player-header th, .table-player-header td { font-size: 1.2em; }
+    .table-player-core th, .table-player-core td { font-size: 1.2em; }
+    .table-frequent-tank { table-layout: auto; }
+    .table-frequent-tank th, .table-frequent-tank td { font-size: 1.2em; }
+    .table-summary-overall th, .table-summary-overall td { font-size: 1.2em; }
+    .table-summary-tank { table-layout: auto; }
+    .table-summary-tank th, .table-summary-tank td { font-size: 1.2em; }
+
+    /* =========================
+       盒子模块（无多余间距）
+    ========================== */
+    .box-player {
+      padding: 0;
+      margin-bottom: 24px;
+    }
+
+    .box-frequent-tank {
+      padding: 0;
+    }
+
+    /* =========================
+       战绩模块（修复容器缺失，统一间距）
+    ========================== */
+    .summary-content {
+      padding: 0 !important;
+      margin: 0 !important;
+      width: 100%;
+    }
+
+    .summary-time {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      padding: 16px;
+      background: #f8f9fa;
+      text-align: center;
+      margin: 0 0 16px 0 !important;
+      border: 1px solid #dee2e6;
+      border-radius: 0;
+      font-size: 1.05em;
+      color: #495057;
+      width: 100%;
+    }
+
+    .table-summary-overall {
+      margin-bottom: 24px !important;
+    }
+
+    /* =========================
+       高亮 & 颜色体系（优化色值，更醒目）
+    ========================== */
+    .highlight-win { color: #198754; }
+    .highlight-loss { color: #dc3545; }
+    .premium-tank { color: #fd7e14; font-weight: bold; }
+    .normal-tank { color: #212529; }
+
+    .power-red { color: #dc3545; }
+    .power-green { color: #198754; }
+    .power-blue { color: #0d6efd; }
+    .power-purple { color: #b30aec; }
+    .power-gold { color: #fd7e14; }
+
+    .power-float-up { color: #198754; }
+    .power-float-down { color: #dc3545; }
+    .power-float-other{ color: #212529}
+
+    .tank-type-spg { color: #dc3545; }
+    .tank-type-medium { color: #fd7e14; }
+    .tank-type-at-spg { color: #0d6efd; }
+    .tank-type-heavy { color: #343a40; }
+    .tank-type-light { color: #198754; }
+
+    /* =========================
+       响应式优化（适配更小屏幕）
+    ========================== */
+    @media (max-width: 1920px) {
+      body { font-size: 28px; } /* 大屏适配，降低字号 */
+    }
+    @media (max-width: 1200px) {
+      body { font-size: 20px; }
+      .summary-time { grid-template-columns: 1fr; }
+      table th { padding: 8px 4px; }
+      table td { padding: 6px 2px; }
+      .box-player { margin-bottom: 16px; }
+      .summary-time { margin-bottom: 12px !important; }
+      .table-summary-overall { margin-bottom: 16px !important; }
+    }
+    @media (max-width: 768px) {
+      body { font-size: 16px; padding: 10px; }
+      .container { padding: 12px; }
+      .module-title { padding: 12px; font-size: 1.2em; }
+    }
+  </style>
+</head>
+
+<body>
+<div class="container">
+
+  <!-- ================= 模块一：盒子 ================= -->
+  <section class="module module-box">
+    <div class="module-title">盒子数据</div>
+
+    <div class="box-player">
+      <table class="table-player-header">
+        <tr>
+          <th>玩家</th><th>效率</th><th>更新时间</th>
+        </tr>
+        <tr>
+          <td>常威爆打来福</td>
+          <td>
+              <span class="power-green
+">
+                  1156
+              </span>
+              <span class="    power-float-up
+">
+                  +0
+              </span>
+          </td>
+          <td>2026-03-12</td>
+        </tr>
+      </table>
+
+      <table class="table-player-core">
+        <tr>
+          <th>胜率</th><th>胜</th><th>负</th><th>总</th>
+          <th>命中率</th><th>等级</th><th>杀伤</th>
+          <th>经验</th><th>击毁</th><th>占领</th><th>防守</th><th>发现</th>
+        </tr>
+        <tr>
+          <td>54%</td>
+          <td class="highlight-win">820</td>
+          <td class="highlight-loss">680</td>
+          <td>1500</td>
+          <td>69%</td>
+          <td>8.5级</td>
+          <td>2065</td>
+          <td>627</td>
+          <td>0.90</td>
+          <td>0.97</td>
+          <td>0.91</td>
+          <td>1.10</td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="box-frequent-tank">
+      <table class="table-frequent-tank">
+        <tr>
+          <th>常用坦克</th><th>等级</th><th>类型</th><th>胜率</th>
+          <th>胜</th><th>场均效率</th><th>场均伤害</th>
+          <th>场均经验</th><th>场均击毁</th><th>场均银币</th><th>命中率</th>
+        </tr>
+        <tr>
+          <td>
+              <span class="premium-tank
+">
+                  ISU-122-2
+              </span>
+          </td>
+          <td>8</td>
+          <td>
+          <span class="tank-type-at-spg
+">
+              支援反坦
+          </span>
+          </td>
+          <td>56%</td>
+          <td class="highlight-win">68</td>
+          <td>
+              <span class="power-blue
+">
+                  1298
+              </span>
+          </td>
+          <td>1967</td>
+          <td>645</td>
+          <td>1.18</td>
+          <td>40997</td>
+          <td>70%</td>
+        </tr>
+        <tr>
+          <td>
+              <span class="premium-tank
+">
+                  天蝎
+              </span>
+          </td>
+          <td>8</td>
+          <td>
+          <span class="tank-type-at-spg
+">
+              狙击反坦
+          </span>
+          </td>
+          <td>46%</td>
+          <td class="highlight-win">52</td>
+          <td>
+              <span class="power-green
+">
+                  935
+              </span>
+          </td>
+          <td>1966</td>
+          <td>570</td>
+          <td>1.04</td>
+          <td>39080</td>
+          <td>62%</td>
+        </tr>
+        <tr>
+          <td>
+              <span class="premium-tank
+">
+                  DBV-152
+              </span>
+          </td>
+          <td>10</td>
+          <td>
+          <span class="tank-type-at-spg
+">
+              狙击反坦
+          </span>
+          </td>
+          <td>61%</td>
+          <td class="highlight-win">62</td>
+          <td>
+              <span class="power-blue
+">
+                  1337
+              </span>
+          </td>
+          <td>2771</td>
+          <td>611</td>
+          <td>1.39</td>
+          <td>25903</td>
+          <td>71%</td>
+        </tr>
+        <tr>
+          <td>
+              <span class="premium-tank
+">
+                  FV226 反制者
+              </span>
+          </td>
+          <td>8</td>
+          <td>
+          <span class="tank-type-heavy
+">
+              全能重坦
+          </span>
+          </td>
+          <td>68%</td>
+          <td class="highlight-win">49</td>
+          <td>
+              <span class="power-purple
+">
+                  1463
+              </span>
+          </td>
+          <td>2153</td>
+          <td>770</td>
+          <td>1.15</td>
+          <td>47996</td>
+          <td>75%</td>
+        </tr>
+        <tr>
+          <td>
+              <span class="premium-tank
+">
+                  UDES 03 Alt 3
+              </span>
+          </td>
+          <td>9</td>
+          <td>
+          <span class="tank-type-medium
+">
+              狙击中坦
+          </span>
+          </td>
+          <td>57%</td>
+          <td class="highlight-win">39</td>
+          <td>
+              <span class="power-blue
+">
+                  1221
+              </span>
+          </td>
+          <td>2006</td>
+          <td>649</td>
+          <td>1.21</td>
+          <td>44182</td>
+          <td>70%</td>
+        </tr>
+      </table>
+    </div>
+  </section>
+
+  <!-- ================= 模块二：战绩（修复容器包裹） ================= -->
+  <section class="module module-summary">
+    <div class="module-title">两日战绩</div>
+    <!-- 新增summary-content容器，保证间距统一 -->
+    <div class="summary-content">
+
+      <div style="padding: 20px; text-align: center; color: #999;">
+        暂无该时间段内的详细对战记录
+      </div>
+    </div>
+  </section>
+
+</div>
+</body>
+</html>
