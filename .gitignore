@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.idea/
+
+runtime/
+resources/static/data/player_name_binding.json
