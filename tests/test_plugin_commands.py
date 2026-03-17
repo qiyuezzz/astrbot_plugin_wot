@@ -9,10 +9,10 @@ from data.plugins.astrbot_plugin_wot.main import (
     _build_basic_efficiency_text_component,
     _resolve_player_name,
 )
-from data.plugins.astrbot_plugin_wot.src.domain.report import PlayerStats
 from data.plugins.astrbot_plugin_wot.src.application.basic_efficiency_text_service import (
     get_basic_efficiency_text,
 )
+from data.plugins.astrbot_plugin_wot.src.domain.report import PlayerStats
 
 
 class DummyEvent:
@@ -63,19 +63,30 @@ def test_plugin_module_can_load():
 
 
 @pytest.mark.asyncio
-async def test_plugin_initialize_starts_scheduler(monkeypatch: pytest.MonkeyPatch):
-    called = {"started": False}
+async def test_plugin_initialize_starts_scheduler_and_syncs_tanks(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    called = {"started": False, "synced": False}
 
     def _fake_start_timer_thread():
         called["started"] = True
+
+    def _fake_sync_all_tank_info():
+        called["synced"] = True
+        return "ok"
 
     monkeypatch.setattr(
         "data.plugins.astrbot_plugin_wot.main.start_timer_thread",
         _fake_start_timer_thread,
     )
+    monkeypatch.setattr(
+        "data.plugins.astrbot_plugin_wot.main.sync_all_tank_info",
+        _fake_sync_all_tank_info,
+    )
     plugin = MyPlugin(context=MagicMock())
     await plugin.initialize()
     assert called["started"] is True
+    assert called["synced"] is True
 
 
 def test_get_basic_efficiency_text_uses_wot_box_gateway(

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from astrbot.core import logger
 from data.plugins.astrbot_plugin_wot.src.infrastructure.clients.wot_game_api import (
@@ -13,7 +12,7 @@ from data.plugins.astrbot_plugin_wot.src.infrastructure.clients.wotinspector_tan
     fetch_tank_db_js,
     parse_tank_db,
 )
-from data.plugins.astrbot_plugin_wot.src.settings.constants import tank_info_path
+from data.plugins.astrbot_plugin_wot.src.settings.storage import prepare_tank_info_path
 
 
 def sync_all_tank_info():
@@ -48,7 +47,8 @@ def sync_all_tank_info():
     except Exception as exc:
         logger.warning(f"WotInspector 坦克信息合并失败: {exc}")
 
-    with Path(tank_info_path).open("w", encoding="utf-8") as f:
+    tank_info_file = prepare_tank_info_path()
+    with tank_info_file.open("w", encoding="utf-8") as f:
         json.dump(name_indexed_library, f, ensure_ascii=False, indent=4)
 
     logger.info(

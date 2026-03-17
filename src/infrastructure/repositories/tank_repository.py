@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 from data.plugins.astrbot_plugin_wot.src.domain.enums import (
     TankNationEnum,
@@ -9,12 +8,13 @@ from data.plugins.astrbot_plugin_wot.src.domain.enums import (
     TankTypeEnum,
 )
 from data.plugins.astrbot_plugin_wot.src.domain.report import Tank
-from data.plugins.astrbot_plugin_wot.src.settings.constants import tank_info_path
+from data.plugins.astrbot_plugin_wot.src.settings.storage import prepare_tank_info_path
 
 
 def get_tank_info_by_name(tank_name: str) -> Tank:
     try:
-        with Path(tank_info_path).open("r", encoding="utf-8") as f:
+        tank_info_file = prepare_tank_info_path()
+        with tank_info_file.open("r", encoding="utf-8") as f:
             tanks_full_info = json.load(f)
         tank_full_info = tanks_full_info.get(tank_name)
         if not tank_full_info:

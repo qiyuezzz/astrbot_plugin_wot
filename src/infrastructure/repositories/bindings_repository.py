@@ -3,10 +3,9 @@ from __future__ import annotations
 import asyncio
 import json
 import threading
-from pathlib import Path
 
 from astrbot.api import logger
-from data.plugins.astrbot_plugin_wot.src.settings.constants import bind_data_path
+from data.plugins.astrbot_plugin_wot.src.settings.storage import prepare_bind_data_path
 
 BINDINGS_LOCK = threading.Lock()
 
@@ -14,8 +13,9 @@ BINDINGS_LOCK = threading.Lock()
 def read_binding_data(send_id: str) -> str | None:
     """Read binding data for one user."""
     try:
+        bind_path = prepare_bind_data_path()
         with BINDINGS_LOCK:
-            with Path(bind_data_path).open("r", encoding="utf-8") as f:
+            with bind_path.open("r", encoding="utf-8") as f:
                 bind_data = json.load(f)
         player_name = bind_data.get(send_id)
         return player_name if player_name else None
@@ -34,11 +34,11 @@ def binding_exists(send_id: str) -> bool:
 
 
 def _write_binding_data_sync(qq_id: str, player_name: str) -> bool:
-    Path(bind_data_path).parent.mkdir(parents=True, exist_ok=True)
+    bind_path = prepare_bind_data_path()
     bind_data: dict[str, str] = {}
     with BINDINGS_LOCK:
         try:
-            with Path(bind_data_path).open("r", encoding="utf-8") as f:
+            with bind_path.open("r", encoding="utf-8") as f:
                 content = f.read()
                 if content.strip():
                     bind_data = json.loads(content)
@@ -49,7 +49,7 @@ def _write_binding_data_sync(qq_id: str, player_name: str) -> bool:
 
         bind_data[qq_id] = player_name
 
-        with Path(bind_data_path).open("w", encoding="utf-8") as f:
+        with bind_path.open("w", encoding="utf-8") as f:
             f.write(json.dumps(bind_data, ensure_ascii=False, indent=4))
     return True
 
