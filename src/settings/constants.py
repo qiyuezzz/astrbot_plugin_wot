@@ -51,9 +51,9 @@ def _env_float(name: str, default: float) -> float:
 report_image_width = _env_int("WOT_REPORT_IMAGE_WIDTH", 2560)
 report_image_min_height = _env_int("WOT_REPORT_IMAGE_MIN_HEIGHT", 2800)
 report_image_base_height = _env_int("WOT_REPORT_IMAGE_BASE_HEIGHT", 500)
-report_image_per_summary_row = _env_int("WOT_REPORT_IMAGE_PER_SUMMARY_ROW", 95)
+report_image_per_summary_row = _env_int("WOT_REPORT_IMAGE_PER_SUMMARY_ROW", 80)
 report_image_max_height = _env_int("WOT_REPORT_IMAGE_MAX_HEIGHT", 12000)
-report_image_retry_rows_threshold = _env_int("WOT_REPORT_RETRY_ROWS_THRESHOLD", 24)
+report_image_retry_rows_threshold = _env_int("WOT_REPORT_RETRY_ROWS_THRESHOLD", 999)
 report_image_retry_height_scale = _env_float("WOT_REPORT_RETRY_HEIGHT_SCALE", 1.25)
 report_image_retry_extra_height = _env_int("WOT_REPORT_RETRY_EXTRA_HEIGHT", 600)
 
