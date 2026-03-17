@@ -4,6 +4,7 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 
+from astrbot.api import logger
 from data.plugins.astrbot_plugin_wot.src.domain.report import (
     FinalSummary,
     OverallSummary,
@@ -43,7 +44,14 @@ def get_detail_record_list(
         }
 
         for future in as_completed(future_to_arena):
-            result = future.result()
+            arena = future_to_arena[future]
+            try:
+                result = future.result()
+            except Exception as exc:
+                logger.warning(
+                    f"Failed to fetch battle detail for arena {arena.arena_id}: {exc}"
+                )
+                continue
             if result:
                 detail_record_list.append(result)
 

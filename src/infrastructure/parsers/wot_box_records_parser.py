@@ -33,7 +33,16 @@ def parse_battle_detail(raw_text: str, arena: RecordsBasic) -> RecordsDetail | N
         logger.error("Failed to locate JSON in battle detail response")
         return None
 
-    data = json.loads(json_match.group()).get("result", {})
+    payload = json.loads(json_match.group())
+    data = payload.get("result", {})
+    if not isinstance(data, dict):
+        logger.warning(
+            "Battle detail payload is not a dict, arena_id=%s, message=%s",
+            arena.arena_id,
+            payload.get("message", ""),
+        )
+        return None
+
     player_id = int(data.get("player_id", 0))
     player_data_list: Iterable[dict] = data.get("team_a", [])
     player_data = next(

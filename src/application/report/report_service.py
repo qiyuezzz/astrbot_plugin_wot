@@ -16,8 +16,10 @@ from data.plugins.astrbot_plugin_wot.src.application.report.report_summary_servi
     get_detail_record_list,
     get_final_summary,
 )
-from data.plugins.astrbot_plugin_wot.src.domain.report import WotRenderContext, FinalSummary
-
+from data.plugins.astrbot_plugin_wot.src.domain.report import (
+    FinalSummary,
+    WotRenderContext,
+)
 from data.plugins.astrbot_plugin_wot.src.infrastructure.gateways.wot_box_gateway import (
     WotBoxService,
 )

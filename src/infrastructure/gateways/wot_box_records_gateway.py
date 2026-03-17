@@ -30,9 +30,15 @@ def get_arena_list_by_times(player_name: str, times: int) -> list[RecordsBasic]:
     while len(all_valid_records) < times:
         try:
             raw_json = fetch_arena_page(player_name, page)
+            raw_arenas = raw_json.get("data", {}).get("arenas", [])
+            if not raw_arenas:
+                break
+
             page_records = parse_arena_list(raw_json)
             if not page_records:
-                break
+                page += 1
+                time.sleep(0.2)
+                continue
 
             page_has_new = False
             for record in page_records:
@@ -85,10 +91,14 @@ def get_arena_list_by_days(player_name: str, days: int = 1) -> list[RecordsBasic
         page_has_valid = False
         try:
             raw_json = fetch_arena_page(player_name, page)
-            page_records = parse_arena_list(raw_json)
-
-            if not page_records:
+            raw_arenas = raw_json.get("data", {}).get("arenas", [])
+            if not raw_arenas:
                 break
+
+            page_records = parse_arena_list(raw_json)
+            if not page_records:
+                page += 1
+                continue
 
             for record in page_records:
                 record_timestamp = int(record.start_time)
