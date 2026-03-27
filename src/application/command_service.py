@@ -30,7 +30,10 @@ def extract_arg_after_command(message_str: str, commands: list[str]) -> str:
     normalized = message_str.lstrip("/").strip()
     for cmd in commands:
         if normalized.startswith(cmd):
-            return normalized[len(cmd) :].strip()
+            # 要求命令后要么结束，要么以空白字符开头，避免误触发
+            after_cmd = normalized[len(cmd):].lstrip()
+            if len(normalized) == len(cmd) or normalized[len(cmd)].isspace():
+                return after_cmd
     return ""
 
 

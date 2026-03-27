@@ -53,8 +53,6 @@ class MyPlugin(Star):
     async def command_router(self, event: AstrMessageEvent):
         """监听所有"""
         message_str = event.message_str.strip()
-        if message_str.startswith("/"):
-            return
         routes = [
             (("效率", "盒子效率"), self.query_basic_efficiency),
             (("今日效率", "今日战绩"), self.get_today_performance),
@@ -71,13 +69,16 @@ class MyPlugin(Star):
                     async for result in handler(event, message_text=at_followed_text):
                         yield result
                     return
-        # 匹配触发词（允许不带/和带参数）
+        # 匹配触发词（必须命令和参数之间有分隔）
         for commands, handler in routes:
-            if message_str.startswith(commands):
-                # 因为 handler 里面有 yield，所以需要异步迭代
-                async for result in handler(event):
-                    yield result
-                return  # 触发后直接结束
+            for cmd in commands:
+                if message_str.startswith(cmd):
+                    # 要求命令后要么结束（查询自己），要么是空格分隔
+                    if len(message_str) == len(cmd) or message_str[len(cmd)].isspace():
+                        # 因为 handler 里面有 yield，所以需要异步迭代
+                        async for result in handler(event):
+                            yield result
+                        return  # 触发后直接结束
 
     @filter.command("wot绑定")
     async def wot_bind_player_name(self, event: AstrMessageEvent):
