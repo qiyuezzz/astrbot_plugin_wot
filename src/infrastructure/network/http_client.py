@@ -61,6 +61,7 @@ class HttpClient:
             headers=headers,
             params=params,
             timeout=config.DEFAULT_TIMEOUT,
+            verify=config.verify_ssl,
         )
         resp.raise_for_status()
         return resp
@@ -86,6 +87,7 @@ class HttpClient:
             data=data,  # form
             json=json,  # json body
             timeout=config.DEFAULT_TIMEOUT,
+            verify=config.verify_ssl,
         )
         resp.raise_for_status()
         return resp

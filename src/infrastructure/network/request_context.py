@@ -8,6 +8,7 @@ class BaseConfig:
     use_session: bool = False  # 是否使用 Session
     need_csrf: bool = False  # 是否自动注入 CSRF
     warmup_url: str | None = None  # 预热地址（获取 cookie）
+    verify_ssl: bool = True  # 是否验证 SSL 证书
 
     def build_headers(self) -> dict:
         """统一 Header 构造入口（可覆写）"""
@@ -21,7 +22,8 @@ class BaseConfig:
 class WotBoxStatsConfig(BaseConfig):
     """获取偶游盒子统计页面"""
 
-    base_url = "https://wotbox.ouj.com/wotbox/index.php"
+    base_url = "http://wotbox.ouj.com/wotbox/index.php"
+    verify_ssl = False
 
     def build_params(self):
         return {"r": "default/index", "pn": ""}
@@ -36,7 +38,8 @@ class WotBoxStatsConfig(BaseConfig):
 class WotBoxAreanListConfig(BaseConfig):
     """获取玩家对局列表"""
 
-    base_url = "https://wotapp.ouj.com/index.php"
+    base_url = "http://wotapp.ouj.com/index.php"
+    verify_ssl = False
 
     def build_params(self):
         return {"r": "wx/ajaxLoadArenas", "p": "", "pn": ""}
@@ -51,7 +54,8 @@ class WotBoxAreanListConfig(BaseConfig):
 class WotBoxDetailRecordConfig(BaseConfig):
     """根据对局id获取对局详细详细信息"""
 
-    base_url = "https://wotapp.ouj.com/"
+    base_url = "http://wotapp.ouj.com/"
+    verify_ssl = False
 
     def build_params(self):
         return {"r": "wotboxapi/battledetail", "pn": "", "arena_id": ""}
