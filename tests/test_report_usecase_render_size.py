@@ -1,3 +1,13 @@
+from data.plugins.astrbot_plugin_wot.src.application.report.report_renderer import (
+    count_table_rows,
+    estimate_retry_screenshot_size,
+    estimate_screenshot_size,
+)
+from data.plugins.astrbot_plugin_wot.src.domain.report import (
+    FinalSummary,
+    PlayerStats,
+    WotRenderContext,
+)
 from data.plugins.astrbot_plugin_wot.src.settings.constants import (
     report_image_base_height,
     report_image_max_height,
@@ -5,16 +15,6 @@ from data.plugins.astrbot_plugin_wot.src.settings.constants import (
     report_image_per_summary_row,
     report_image_retry_rows_threshold,
     report_image_width,
-)
-from data.plugins.astrbot_plugin_wot.src.domain.report import (
-    FinalSummary,
-    PlayerStats,
-    WotRenderContext,
-)
-from data.plugins.astrbot_plugin_wot.src.application.report.report_renderer import (
-    count_table_rows,
-    estimate_retry_screenshot_size,
-    estimate_screenshot_size,
 )
 
 
@@ -74,8 +74,8 @@ def test_estimate_retry_size_returns_none_when_below_threshold():
 
 def test_estimate_retry_size_returns_larger_height_when_needed():
     context = _build_context(summary_rows=report_image_retry_rows_threshold + 8)
-    current = estimate_screenshot_size(context)
-    retry = estimate_retry_screenshot_size(context, current)
+    current = estimate_screenshot_size(context, table_rows=report_image_retry_rows_threshold + 8)
+    retry = estimate_retry_screenshot_size(context, current, table_rows=report_image_retry_rows_threshold + 8)
     assert retry is not None
     assert retry[0] == current[0]
     assert retry[1] > current[1]

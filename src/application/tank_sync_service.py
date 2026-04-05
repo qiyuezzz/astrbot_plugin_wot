@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import json
 
-from astrbot.core import logger
-from data.plugins.astrbot_plugin_wot.src.infrastructure.clients.wot_game_api import (
+from astrbot.api import logger
+from data.plugins.astrbot_plugin_wot.src.infrastructure.api_clients.wot_game_api import (
     fetch_all_tank_info,
 )
-from data.plugins.astrbot_plugin_wot.src.infrastructure.clients.wotinspector_tanks_api import (
+from data.plugins.astrbot_plugin_wot.src.infrastructure.api_clients.wotinspector_tanks_api import (
     build_nation_map,
     build_wotinspector_tanks,
     fetch_tank_db_js,
@@ -15,13 +15,12 @@ from data.plugins.astrbot_plugin_wot.src.infrastructure.clients.wotinspector_tan
 from data.plugins.astrbot_plugin_wot.src.settings.storage import prepare_tank_info_path
 
 
-def sync_all_tank_info():
+async def sync_all_tank_info():
     """Sync full tank info with official + WotInspector."""
-    resp = fetch_all_tank_info()
+    resp = await fetch_all_tank_info()
     if resp is None:
         return "更新失败"
-    resp.raise_for_status()
-    result = resp.json()
+    result = await resp.json()
     inner_data = result.get("data", {})
 
     params = inner_data.get("parameters", [])
@@ -36,7 +35,7 @@ def sync_all_tank_info():
 
     wotinspector_count = 0
     try:
-        tank_db_js = fetch_tank_db_js()
+        tank_db_js = await fetch_tank_db_js()
         tank_db = parse_tank_db(tank_db_js)
         nation_map = build_nation_map(name_indexed_library)
         wotinspector_tanks = build_wotinspector_tanks(tank_db, nation_map)

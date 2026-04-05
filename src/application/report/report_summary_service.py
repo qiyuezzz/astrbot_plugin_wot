@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 from collections import defaultdict
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
+from enum import Enum
 
 from astrbot.api import logger
 from data.plugins.astrbot_plugin_wot.src.domain.report import (
@@ -16,6 +17,23 @@ from data.plugins.astrbot_plugin_wot.src.domain.report import (
 from data.plugins.astrbot_plugin_wot.src.infrastructure.gateways.wot_box_records_gateway import (
     get_detail_record_single,
 )
+from data.plugins.astrbot_plugin_wot.src.infrastructure.network.http_client import (
+    HttpClient,
+)
+
+
+class BattleResult(str, Enum):
+    """战斗结果"""
+
+    WIN = "win"
+    LOSE = "lose"
+    DRAW = "draw"
+
+
+def parse_battle_result(is_win: str) -> BattleResult:
+    """将 is_win 字符串解析为 BattleResult 枚举"""
+    mapping = {"1": BattleResult.WIN, "0": BattleResult.LOSE, "2": BattleResult.DRAW}
+    return mapping.get(is_win, BattleResult.LOSE)
 
 
 def get_final_summary(
@@ -32,40 +50,44 @@ def get_final_summary(
     )
 
 
-def get_detail_record_list(
+async def get_detail_record_list(
     player_name: str, arena_list: list[RecordsBasic]
 ) -> list[RecordsDetail]:
     detail_record_list: list[RecordsDetail] = []
+    sem = asyncio.Semaphore(5)
 
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        future_to_arena = {
-            executor.submit(get_detail_record_single, player_name, arena): arena
-            for arena in arena_list
-        }
+    async with HttpClient() as http:
 
-        for future in as_completed(future_to_arena):
-            arena = future_to_arena[future]
-            try:
-                result = future.result()
-            except Exception as exc:
-                logger.warning(
-                    f"Failed to fetch battle detail for arena {arena.arena_id}: {exc}"
-                )
-                continue
-            if result:
-                detail_record_list.append(result)
+        async def _fetch_one(arena: RecordsBasic) -> RecordsDetail | None:
+            async with sem:
+                try:
+                    return await get_detail_record_single(player_name, arena, http=http)
+                except Exception as exc:
+                    logger.warning(
+                        f"Failed to fetch battle detail for arena {arena.arena_id}: {exc}"
+                    )
+                    return None
+
+        results = await asyncio.gather(*[_fetch_one(arena) for arena in arena_list])
+    for result in results:
+        if result:
+            detail_record_list.append(result)
 
     detail_record_list.sort(key=lambda x: x.records_basic.start_time, reverse=True)
     return detail_record_list
+
+
+def _tally_result(counts: dict[str, int], is_win: str) -> None:
+    """根据战斗结果更新计数"""
+    result = parse_battle_result(is_win)
+    counts[result.value] += 1
 
 
 def _calculate_overall_summary(
     detail_record_list: list[RecordsDetail],
 ) -> OverallSummary:
     total_count = len(detail_record_list)
-    win_count = 0
-    lose_count = 0
-    draw_count = 0
+    counts = {"win": 0, "lose": 0, "draw": 0}
     sums = {
         "power": 0.0,
         "damage": 0,
@@ -78,12 +100,7 @@ def _calculate_overall_summary(
     }
 
     for detail_record in detail_record_list:
-        if detail_record.records_basic.is_win == "1":
-            win_count += 1
-        elif detail_record.records_basic.is_win == "0":
-            lose_count += 1
-        elif detail_record.records_basic.is_win == "2":
-            draw_count += 1
+        _tally_result(counts, detail_record.records_basic.is_win)
 
         sums["power"] += detail_record.power
         sums["damage"] += detail_record.damage_dealt
@@ -96,11 +113,11 @@ def _calculate_overall_summary(
 
     return OverallSummary(
         avg_tier=round(sums["tier"] / total_count, 1),
-        win_rate=round(win_count / total_count * 100, 2),
+        win_rate=round(counts["win"] / total_count * 100, 2),
         total_count=total_count,
-        win_count=win_count,
-        lose_count=lose_count,
-        draw_count=draw_count,
+        win_count=counts["win"],
+        lose_count=counts["lose"],
+        draw_count=counts["draw"],
         avg_power=round(sums["power"] / total_count, 2),
         avg_damage=round(sums["damage"] / total_count, 2),
         avg_assist_total=round(sums["assist"] / total_count, 2),
@@ -119,63 +136,58 @@ def _calculate_tank_summary(
         lambda: {
             "tank_info": Tank,
             "marks_on_gun": 0,
-            "total_count": 0,
-            "win_count": 0,
-            "lose_count": 0,
-            "draw_count": 0,
-            "total_power": 0.0,
-            "total_damage": 0,
-            "assist_total": 0,
-            "total_blocked": 0,
-            "total_exp": 0,
-            "total_credits": 0.0,
-            "total_life_time": 0,
+            "counts": {"win": 0, "lose": 0, "draw": 0},
+            "totals": {
+                "power": 0.0,
+                "damage": 0,
+                "assist_total": 0,
+                "blocked": 0,
+                "exp": 0,
+                "credits": 0.0,
+                "life_time": 0,
+            },
         }
     )
 
     for detail_record in detail_record_list:
-        tank_count = summary[detail_record.tank_info.name]
-        tank_count["tank_info"] = detail_record.tank_info
-        tank_count["marks_on_gun"] = detail_record.marks_on_gun
-        tank_count["total_count"] += 1
-        if detail_record.records_basic.is_win == "1":
-            tank_count["win_count"] += 1
-        elif detail_record.records_basic.is_win == "0":
-            tank_count["lose_count"] += 1
-        elif detail_record.records_basic.is_win == "2":
-            tank_count["draw_count"] += 1
+        tank_data = summary[detail_record.tank_info.name]
+        tank_data["tank_info"] = detail_record.tank_info
+        tank_data["marks_on_gun"] = detail_record.marks_on_gun
+        _tally_result(tank_data["counts"], detail_record.records_basic.is_win)
 
-        tank_count["total_power"] += detail_record.power
-        tank_count["total_damage"] += detail_record.damage_dealt
-        tank_count["assist_total"] += detail_record.assist_total
-        tank_count["total_blocked"] += detail_record.blocked
-        tank_count["total_exp"] += detail_record.exp
-        tank_count["total_credits"] += detail_record.credits
-        tank_count["total_life_time"] += detail_record.life_time
+        t = tank_data["totals"]
+        t["power"] += detail_record.power
+        t["damage"] += detail_record.damage_dealt
+        t["assist_total"] += detail_record.assist_total
+        t["blocked"] += detail_record.blocked
+        t["exp"] += detail_record.exp
+        t["credits"] += detail_record.credits
+        t["life_time"] += detail_record.life_time
 
     for data in summary.values():
-        total_count = data["total_count"]
+        total_count = sum(data["counts"].values())
+        c = data["counts"]
+        t = data["totals"]
         tank_summary_list.append(
             TankSummary(
                 tank_info=data["tank_info"],
                 gun_marks=data["marks_on_gun"],
-                win_rate=round(data["win_count"] / total_count * 100, 2),
+                win_rate=round(c["win"] / total_count * 100, 2),
                 total_count=total_count,
-                win_count=data["win_count"],
-                lose_count=data["lose_count"],
-                draw_count=data["draw_count"],
-                avg_power=round(data["total_power"] / total_count, 2),
-                avg_damage=round(data["total_damage"] / total_count, 2),
-                avg_assist_total=round(data["assist_total"] / total_count, 2),
-                avg_block=round(data["total_blocked"] / total_count, 2),
-                avg_exp=round(data["total_exp"] / total_count, 2),
-                avg_credits=round(data["total_credits"] / total_count, 2),
-                avg_life_time=round(data["total_life_time"] / total_count),
+                win_count=c["win"],
+                lose_count=c["lose"],
+                draw_count=c["draw"],
+                avg_power=round(t["power"] / total_count, 2),
+                avg_damage=round(t["damage"] / total_count, 2),
+                avg_assist_total=round(t["assist_total"] / total_count, 2),
+                avg_block=round(t["blocked"] / total_count, 2),
+                avg_exp=round(t["exp"] / total_count, 2),
+                avg_credits=round(t["credits"] / total_count, 2),
+                avg_life_time=round(t["life_time"] / total_count),
             )
         )
 
     tank_summary_list.sort(
-        key=lambda x: (x.total_count, x.tank_info.tier),
-        reverse=True,
+        key=lambda x: (x.total_count, x.tank_info.tier), reverse=True
     )
     return tank_summary_list

@@ -14,10 +14,6 @@ DATA_DIR_NAME = "data"
 REPORT_DIR_NAME = "report"
 
 
-def get_plugin_name() -> str:
-    return PLUGIN_NAME
-
-
 def get_plugin_package_dir() -> Path:
     return Path(__file__).resolve().parents[2]
 

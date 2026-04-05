@@ -1,3 +1,4 @@
+import asyncio
 import threading
 import time
 
@@ -14,7 +15,7 @@ _scheduler_started = False
 def run_scheduler():
     def daily_task():
         logger.info("开始执行每日任务...")
-        sync_all_tank_info()
+        asyncio.run(sync_all_tank_info())
         logger.info("任务完成")
 
     schedule.every().day.at("10:00").do(daily_task)
@@ -28,7 +29,6 @@ def start_timer_thread():
     global _scheduler_started
     if _scheduler_started:
         return
-    # 创建一个守护线程，专门跑定时任务
     t = threading.Thread(target=run_scheduler, daemon=True)
     t.start()
     _scheduler_started = True

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import threading
 import time
 from dataclasses import dataclass
@@ -22,7 +23,7 @@ REPORT_CONTEXT_INFLIGHT_LOCK = threading.Lock()
 
 @dataclass
 class _InFlightContext:
-    event: threading.Event
+    event: asyncio.Event | threading.Event
     result: Any = None
     error: Exception | None = None
 
@@ -64,7 +65,7 @@ def set_cached_report_context(cache_key: ReportCacheKey, context) -> None:
         REPORT_CONTEXT_CACHE.pop(oldest_key, None)
 
 
-def run_with_inflight_dedupe(
+async def run_with_inflight_dedupe(
     cache_key: ReportCacheKey,
     build_func,
 ):
@@ -72,27 +73,32 @@ def run_with_inflight_dedupe(
     with REPORT_CONTEXT_INFLIGHT_LOCK:
         inflight = REPORT_CONTEXT_INFLIGHT.get(cache_key)
         if inflight is None:
-            inflight = _InFlightContext(event=threading.Event())
+            inflight = _InFlightContext(event=asyncio.Event())
             REPORT_CONTEXT_INFLIGHT[cache_key] = inflight
             owner = True
 
     if not owner:
-        finished = inflight.event.wait(
-            timeout=max(1, report_query_inflight_wait_timeout_seconds)
-        )
+        try:
+            finished = await asyncio.wait_for(
+                inflight.event.wait(),
+                timeout=max(1, report_query_inflight_wait_timeout_seconds),
+            )
+        except (TimeoutError, asyncio.TimeoutError):
+            logger.warning(f"等待同 key 渲染超时，退化为独立构建：{cache_key}")
+            return await build_func()
         if not finished:
             logger.warning(f"等待同 key 渲染超时，退化为独立构建：{cache_key}")
-            return build_func()
+            return await build_func()
         if inflight.error:
             raise inflight.error
         if inflight.result is not None:
             return inflight.result
         if cached := get_cached_report_context(cache_key):
             return cached
-        return build_func()
+        return await build_func()
 
     try:
-        result = build_func()
+        result = await build_func()
         inflight.result = result
         return result
     except Exception as exc:

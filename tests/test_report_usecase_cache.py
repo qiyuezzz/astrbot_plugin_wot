@@ -1,11 +1,9 @@
+import asyncio
 import threading
 import time
 
-from data.plugins.astrbot_plugin_wot.src.domain.report import (
-    FinalSummary,
-    PlayerStats,
-    WotRenderContext,
-)
+import pytest
+
 from data.plugins.astrbot_plugin_wot.src.application.report import report_query_cache
 from data.plugins.astrbot_plugin_wot.src.application.report.report_query_cache import (
     REPORT_CONTEXT_CACHE,
@@ -14,6 +12,11 @@ from data.plugins.astrbot_plugin_wot.src.application.report.report_query_cache i
     get_cached_report_context,
     run_with_inflight_dedupe,
     set_cached_report_context,
+)
+from data.plugins.astrbot_plugin_wot.src.domain.report import (
+    FinalSummary,
+    PlayerStats,
+    WotRenderContext,
 )
 
 
@@ -98,7 +101,8 @@ def test_report_context_cache_prunes_oldest(monkeypatch):
     assert key3 in REPORT_CONTEXT_CACHE
 
 
-def test_inflight_dedupe_builds_once_for_same_key(monkeypatch):
+@pytest.mark.asyncio
+async def test_inflight_dedupe_builds_once_for_same_key(monkeypatch):
     clear_report_context_cache()
     clear_report_context_inflight()
     monkeypatch.setattr(
@@ -107,42 +111,24 @@ def test_inflight_dedupe_builds_once_for_same_key(monkeypatch):
 
     key = ("Tester", "今日战绩", "days", 1)
     calls = {"count": 0}
-    release_event = threading.Event()
-    build_started = threading.Event()
-    start_barrier = threading.Barrier(2)
-    results: list = []
-    errors: list[Exception] = []
 
-    def _builder():
+    async def _builder():
         calls["count"] += 1
-        build_started.set()
-        time.sleep(0.2)
-        release_event.wait(timeout=2)
+        await asyncio.sleep(0.2)
         return _build_context("Tester")
 
-    def _worker():
-        try:
-            start_barrier.wait(timeout=2)
-            results.append(run_with_inflight_dedupe(key, _builder))
-        except Exception as exc:  # pragma: no cover
-            errors.append(exc)
+    async def _worker():
+        return await run_with_inflight_dedupe(key, _builder)
 
-    t1 = threading.Thread(target=_worker)
-    t2 = threading.Thread(target=_worker)
-    t1.start()
-    t2.start()
-    assert build_started.wait(timeout=1)
-    release_event.set()
-    t1.join(timeout=3)
-    t2.join(timeout=3)
+    results = await asyncio.gather(_worker(), _worker())
 
-    assert not errors
     assert calls["count"] == 1
     assert len(results) == 2
     assert results[0] is results[1]
 
 
-def test_inflight_dedupe_propagates_build_error(monkeypatch):
+@pytest.mark.asyncio
+async def test_inflight_dedupe_propagates_build_error(monkeypatch):
     clear_report_context_cache()
     clear_report_context_inflight()
     monkeypatch.setattr(
@@ -150,25 +136,18 @@ def test_inflight_dedupe_propagates_build_error(monkeypatch):
     )
 
     key = ("Tester", "今日战绩", "days", 1)
-    start_barrier = threading.Barrier(2)
     errors: list[str] = []
 
-    def _builder():
+    async def _builder():
         raise RuntimeError("boom")
 
-    def _worker():
+    async def _worker():
         try:
-            start_barrier.wait(timeout=2)
-            run_with_inflight_dedupe(key, _builder)
+            await run_with_inflight_dedupe(key, _builder)
         except Exception as exc:
             errors.append(str(exc))
 
-    t1 = threading.Thread(target=_worker)
-    t2 = threading.Thread(target=_worker)
-    t1.start()
-    t2.start()
-    t1.join(timeout=3)
-    t2.join(timeout=3)
+    await asyncio.gather(_worker(), _worker())
 
     assert len(errors) == 2
     assert all("boom" in message for message in errors)

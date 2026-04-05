@@ -2,12 +2,12 @@ from __future__ import annotations
 
 import json
 
-from data.plugins.astrbot_plugin_wot.src.domain.enums import (
+from data.plugins.astrbot_plugin_wot.src.domain.report import (
+    Tank,
     TankNationEnum,
     TankRoleEnum,
     TankTypeEnum,
 )
-from data.plugins.astrbot_plugin_wot.src.domain.report import Tank
 from data.plugins.astrbot_plugin_wot.src.settings.storage import prepare_tank_info_path
 
 

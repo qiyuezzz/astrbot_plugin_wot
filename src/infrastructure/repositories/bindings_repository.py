@@ -11,7 +11,7 @@ BINDINGS_LOCK = threading.Lock()
 
 
 def read_binding_data(send_id: str) -> str | None:
-    """Read binding data for one user."""
+    """读取单个用户的绑定数据"""
     try:
         bind_path = prepare_bind_data_path()
         with BINDINGS_LOCK:
@@ -55,7 +55,7 @@ def _write_binding_data_sync(qq_id: str, player_name: str) -> bool:
 
 
 async def write_binding_data(qq_id: str, player_name: str) -> bool:
-    """Upsert binding data."""
+    """写入或更新绑定数据"""
     try:
         return await asyncio.to_thread(_write_binding_data_sync, qq_id, player_name)
     except Exception as exc:

@@ -1,1 +1,1 @@
-"""Infrastructure gateways for external WOT data sources."""
+"""外部WOT数据源的基础设施网关"""

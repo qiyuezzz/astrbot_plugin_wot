@@ -1,16 +1,19 @@
 from importlib import import_module
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 import astrbot.api.message_components as Comp
-from data.plugins.astrbot_plugin_wot.main import (
-    MyPlugin,
-    _build_basic_efficiency_text_component,
-    _resolve_player_name,
-)
-from data.plugins.astrbot_plugin_wot.src.application.basic_efficiency_text_service import (
+from data.plugins.astrbot_plugin_wot.main import MyPlugin
+from data.plugins.astrbot_plugin_wot.src.application.efficiency_service import (
     get_basic_efficiency_text,
+)
+from data.plugins.astrbot_plugin_wot.src.application.player_resolver import (
+    resolve_player_name,
+)
+from data.plugins.astrbot_plugin_wot.src.application.message_parser import CommandInput
+from data.plugins.astrbot_plugin_wot.src.application.query_service import (
+    build_efficiency_response,
 )
 from data.plugins.astrbot_plugin_wot.src.domain.report import PlayerStats
 
@@ -23,6 +26,9 @@ class DummyEvent:
 
     def get_sender_id(self):
         return self._sender_id
+
+    def get_self_id(self):
+        return "bot_123"
 
     def get_messages(self):
         return self._messages
@@ -71,7 +77,7 @@ async def test_plugin_initialize_starts_scheduler_and_syncs_tanks(
     def _fake_start_timer_thread():
         called["started"] = True
 
-    def _fake_sync_all_tank_info():
+    async def _fake_sync_all_tank_info():
         called["synced"] = True
         return "ok"
 
@@ -89,85 +95,96 @@ async def test_plugin_initialize_starts_scheduler_and_syncs_tanks(
     assert called["synced"] is True
 
 
-def test_get_basic_efficiency_text_uses_wot_box_gateway(
+@pytest.mark.asyncio
+async def test_get_basic_efficiency_text_uses_wot_box_gateway(
     monkeypatch: pytest.MonkeyPatch,
 ):
     stats = _sample_player_stats()
 
     class FakeWotBoxService:
-        def get_player_stats(self, player_name: str):
+        async def get_player_stats(self, player_name: str):
             assert player_name == "Tester"
             return stats, []
 
     monkeypatch.setattr(
-        "data.plugins.astrbot_plugin_wot.src.application.basic_efficiency_text_service.WotBoxService",
+        "data.plugins.astrbot_plugin_wot.src.application.efficiency_service.WotBoxService",
         FakeWotBoxService,
     )
 
-    text = get_basic_efficiency_text("Tester")
+    text = await get_basic_efficiency_text("Tester")
     assert "玩家：Tester" in text
     assert "场均伤害：2100" in text
 
 
-def test_resolve_player_name_with_explicit_name(monkeypatch: pytest.MonkeyPatch):
+@pytest.mark.asyncio
+async def test_resolve_player_name_with_explicit_name(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
-        "data.plugins.astrbot_plugin_wot.src.application.command_service.player_exists",
-        lambda player_name: player_name == "Tester",
+        "data.plugins.astrbot_plugin_wot.src.application.player_resolver.player_exists",
+        AsyncMock(return_value=True),
     )
-    player_name, err = _resolve_player_name("10001", [], "Tester")
+    player_name, err = await resolve_player_name("10001", [], "Tester")
     assert player_name == "Tester"
     assert err is None
 
 
-def test_resolve_player_name_returns_target_unbound(monkeypatch: pytest.MonkeyPatch):
+@pytest.mark.asyncio
+async def test_resolve_player_name_returns_target_unbound(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
-        "data.plugins.astrbot_plugin_wot.src.application.command_service.read_binding_data",
+        "data.plugins.astrbot_plugin_wot.src.application.player_resolver.read_binding_data",
         lambda _sender_id: "",
     )
     message_chain = [Comp.At(qq="20002")]
 
-    player_name, err = _resolve_player_name("10001", message_chain, None)
+    player_name, err = await resolve_player_name("10001", message_chain, None)
     assert player_name is None
     assert err == "target_unbound"
 
 
-def test_build_basic_efficiency_text_component_success(monkeypatch: pytest.MonkeyPatch):
+@pytest.mark.asyncio
+async def test_build_efficiency_response_success(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
-        "data.plugins.astrbot_plugin_wot.src.application.command_query_service.resolve_player_name",
-        lambda *_args, **_kwargs: ("Tester", None),
+        "data.plugins.astrbot_plugin_wot.src.application.query_service.resolve_player_name",
+        AsyncMock(return_value=("Tester", None)),
     )
     monkeypatch.setattr(
-        "data.plugins.astrbot_plugin_wot.src.application.command_query_service.get_basic_efficiency_text",
-        lambda _player_name: "玩家：Tester\n效率：1234",
+        "data.plugins.astrbot_plugin_wot.src.application.query_service.get_basic_efficiency_text",
+        AsyncMock(return_value="玩家：Tester\n效率：1234"),
     )
 
-    component = _build_basic_efficiency_text_component("10001", [], None)
-    assert isinstance(component, Comp.Plain)
-    assert "效率：1234" in component.text
+    input = CommandInput("10001", [], None)
+    result = await build_efficiency_response(input)
+    assert len(result) == 2
+    assert isinstance(result[0], Comp.At)
+    assert isinstance(result[1], Comp.Plain)
+    assert "效率：1234" in result[1].text
 
 
-def test_build_basic_efficiency_text_component_error(monkeypatch: pytest.MonkeyPatch):
+@pytest.mark.asyncio
+async def test_build_efficiency_response_error(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
-        "data.plugins.astrbot_plugin_wot.src.application.command_query_service.resolve_player_name",
-        lambda *_args, **_kwargs: ("Tester", None),
+        "data.plugins.astrbot_plugin_wot.src.application.query_service.resolve_player_name",
+        AsyncMock(return_value=("Tester", None)),
     )
 
-    def _raise(_player_name: str):
+    async def _raise(_player_name: str):
         raise RuntimeError("network error")
 
     monkeypatch.setattr(
-        "data.plugins.astrbot_plugin_wot.src.application.command_query_service.get_basic_efficiency_text",
+        "data.plugins.astrbot_plugin_wot.src.application.query_service.get_basic_efficiency_text",
         _raise,
     )
     logger_exception = MagicMock()
     monkeypatch.setattr(
-        "data.plugins.astrbot_plugin_wot.src.application.command_query_service.logger.exception",
+        "data.plugins.astrbot_plugin_wot.src.application.query_service.logger.exception",
         logger_exception,
     )
 
-    component = _build_basic_efficiency_text_component("10001", [], None)
-    assert isinstance(component, Comp.Plain)
-    assert component.text == "查询失败，请稍后再试"
+    input = CommandInput("10001", [], None)
+    result = await build_efficiency_response(input)
+    assert len(result) == 2
+    assert isinstance(result[0], Comp.At)
+    assert isinstance(result[1], Comp.Plain)
+    assert result[1].text == "查询失败，请稍后再试"
     logger_exception.assert_called_once()
 
 
@@ -176,8 +193,10 @@ async def test_query_basic_efficiency_command_returns_plain_chain(
     monkeypatch: pytest.MonkeyPatch,
 ):
     monkeypatch.setattr(
-        "data.plugins.astrbot_plugin_wot.main._build_basic_efficiency_text_component",
-        lambda *_args, **_kwargs: Comp.Plain("玩家：Tester\n效率：1234"),
+        "data.plugins.astrbot_plugin_wot.main.build_efficiency_response",
+        AsyncMock(
+            return_value=[Comp.At(qq="10001"), Comp.Plain("玩家：Tester\n效率：1234")]
+        ),
     )
     plugin = MyPlugin(context=MagicMock())
     event = DummyEvent(
@@ -195,25 +214,25 @@ async def test_query_basic_efficiency_command_returns_plain_chain(
 
 
 @pytest.mark.asyncio
-async def test_get_today_performance_still_uses_report_component(
+async def test_get_today_performance_returns_report_chain(
     monkeypatch: pytest.MonkeyPatch,
 ):
-    async def _fake_resolve_report_component(*_args, **_kwargs):
-        return Comp.Plain("old-flow-ok")
+    async def _fake_build_report_response(*_args, **_kwargs):
+        return [Comp.At(qq="10001"), Comp.Plain("report-ok")]
 
     monkeypatch.setattr(
-        "data.plugins.astrbot_plugin_wot.main._resolve_report_component",
-        _fake_resolve_report_component,
+        "data.plugins.astrbot_plugin_wot.main.build_report_response",
+        _fake_build_report_response,
     )
     plugin = MyPlugin(context=MagicMock())
     event = DummyEvent(
         sender_id="10001",
-        message_str="今日效率",
-        messages=[Comp.Plain("今日效率")],
+        message_str="/今日效率",
+        messages=[Comp.Plain("/今日效率")],
     )
 
-    results = [item async for item in plugin.get_today_performance(event)]
+    results = [item async for item in plugin.query_today_report(event)]
     assert len(results) == 1
     assert isinstance(results[0][0], Comp.At)
     assert isinstance(results[0][1], Comp.Plain)
-    assert results[0][1].text == "old-flow-ok"
+    assert results[0][1].text == "report-ok"
