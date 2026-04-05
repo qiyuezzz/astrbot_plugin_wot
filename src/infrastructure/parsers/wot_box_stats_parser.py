@@ -8,16 +8,24 @@ from data.plugins.astrbot_plugin_wot.src.domain.report import (
     FrequentTank,
     PlayerStats,
 )
-from data.plugins.astrbot_plugin_wot.src.infrastructure.parsers.number_utils import (
-    clean_number,
-)
 from data.plugins.astrbot_plugin_wot.src.infrastructure.repositories.tank_repository import (
     get_tank_info_by_name,
 )
 
 
+def clean_number(text, default: str = "0", to_int: bool = False):
+    """从字符串中提取数字"""
+    if text is None or text == "N/A":
+        return 0 if to_int else default
+
+    digits = "".join(re.findall(r"\d+", str(text)))
+    if not digits:
+        return 0 if to_int else default
+    return int(digits) if to_int else digits
+
+
 class WotBoxStatsParser:
-    """Parse WotBox HTML into domain models."""
+    """解析 WotBox HTML 为领域模型"""
 
     def parse_player_stats(
         self, raw_html: str, player_name: str

@@ -1,93 +1,110 @@
-import requests
+from __future__ import annotations
+
+import aiohttp
 
 from data.plugins.astrbot_plugin_wot.src.infrastructure.network.request_context import (
     BaseConfig,
 )
 
 
-class RequestContext:
-    def __init__(self):
-        self.session_map: dict[str, requests.Session] = {}
+class HttpResponse:
+    """封装 HTTP 响应，确保数据在上下文退出后仍可访问"""
 
-    def get_session(self, key: str) -> requests.Session:
-        if key not in self.session_map:
-            self.session_map[key] = requests.Session()
-        return self.session_map[key]
+    def __init__(self, status: int, headers: dict, body: bytes):
+        self.status = status
+        self.headers = headers
+        self._body = body
+
+    async def text(self) -> str:
+        return self._body.decode("utf-8", errors="replace")
+
+    async def json(self):
+        import json
+
+        return json.loads(self._body)
+
+    def raise_for_status(self):
+        if self.status >= 400:
+            raise aiohttp.ClientResponseError(
+                request_info=None,
+                history=(),
+                status=self.status,
+                message=f"HTTP {self.status}",
+            )
 
 
 class HttpClient:
+    """基于 aiohttp 的异步 HTTP 客户端（复用 Session）"""
+
     def __init__(self):
-        self.ctx = RequestContext()
+        self._session: aiohttp.ClientSession | None = None
+        self._timeout = aiohttp.ClientTimeout(total=BaseConfig.DEFAULT_TIMEOUT)
 
-    # =========================
-    # 公共准备逻辑
-    # =========================
-    def _prepare_request(self, config: BaseConfig):
-        # 1️⃣ requester
-        if config.use_session:
-            key = config.base_url.split("/")[2]
-            requester = self.ctx.get_session(key)
-        else:
-            requester = requests
+    async def __aenter__(self):
+        self._session = aiohttp.ClientSession()
+        return self
 
-        # 2️⃣ warmup
-        if config.use_session and config.warmup_url:
-            if not getattr(config, "_warmed", False):
-                requester.get(config.warmup_url)
-                config._warmed = True
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        if self._session:
+            await self._session.close()
+            self._session = None
+        return False
 
-        # 3️⃣ headers
+    async def _prepare_headers(self, config: BaseConfig) -> dict:
         headers = config.build_headers()
 
-        # 4️⃣ csrf
-        if config.need_csrf and requester is not requests:
-            csrf = requester.cookies.get("csrftoken")
+        if config.warmup_url:
+            if not getattr(config, "_warmed", False):
+                await self._session.get(
+                    config.warmup_url,
+                    timeout=self._timeout,
+                    ssl=False,
+                )
+                config._warmed = True
+
+        if config.need_csrf:
+            await self._session.get(
+                config.warmup_url,
+                timeout=self._timeout,
+                ssl=False,
+            )
+            csrf = self._session.cookie_jar.filter_cookies(config.warmup_url).get(
+                "csrftoken"
+            )
             if csrf:
-                headers.setdefault("X-CSRFToken", csrf)
+                headers.setdefault("X-CSRFToken", csrf.value)
 
-        return requester, headers
+        return headers
 
-    # =========================
-    # GET
-    # =========================
-    def send_get(
-        self, config: BaseConfig, params: dict | None = None
-    ) -> requests.Response | None:
-
-        requester, headers = self._prepare_request(config)
-
-        resp = requester.get(
+    async def send_get(self, config: BaseConfig, params: dict | None = None):
+        headers = await self._prepare_headers(config)
+        async with self._session.get(
             url=config.base_url,
             headers=headers,
             params=params,
-            timeout=config.DEFAULT_TIMEOUT,
-            verify=config.verify_ssl,
-        )
-        resp.raise_for_status()
-        return resp
+            timeout=self._timeout,
+            ssl=False,
+        ) as resp:
+            body = await resp.read()
+            return HttpResponse(resp.status, dict(resp.headers), body)
 
-    # =========================
-    # POST
-    # =========================
-    def send_post(
+    async def send_post(
         self,
         config: BaseConfig,
         *,
         params: dict | None = None,
         data: dict | None = None,
-        json: dict | None = None,
-    ) -> requests.Response | None:
-
-        requester, headers = self._prepare_request(config)
-
-        resp = requester.post(
+        json_data: dict | None = None,
+    ):
+        headers = await self._prepare_headers(config)
+        async with self._session.post(
             url=config.base_url,
             headers=headers,
-            params=params,  # url 参数（少见，但留着）
-            data=data,  # form
-            json=json,  # json body
-            timeout=config.DEFAULT_TIMEOUT,
-            verify=config.verify_ssl,
-        )
-        resp.raise_for_status()
-        return resp
+            params=params,
+            data=data,
+            json=json_data,
+            timeout=self._timeout,
+            ssl=False,
+        ) as resp:
+            body = await resp.read()
+            return HttpResponse(resp.status, dict(resp.headers), body)
