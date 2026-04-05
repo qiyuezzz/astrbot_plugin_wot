@@ -69,11 +69,24 @@ async def build_report_response(
 
     async def _query(name: str) -> list[Comp.At | Comp.Image]:
         await report_fn(input.send_id, name)
+        # 从保存的 URL 文件中读取图片 URL
+        import json
+        url_file_path = Path(report_dir_path) / f"{input.send_id}.url"
+        if not url_file_path.exists():
+            logger.error(f"URL 文件不存在：{url_file_path}")
+            raise ValueError("生成图片失败，请稍后再试")
+        
+        with open(url_file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            image_url = data.get("url")
+            if not image_url:
+                logger.error(f"URL 文件中没有图片 URL：{url_file_path}")
+                raise ValueError("生成图片失败，请稍后再试")
+        
+        logger.info(f"使用图片 URL：{image_url}")
         return [
             Comp.At(qq=input.send_id),
-            Comp.Image.fromFileSystem(
-                str(Path(report_dir_path) / f"{input.send_id}.png")
-            ),
+            Comp.Image.fromURL(image_url),
         ]
 
     return await _with_player(input, _query)

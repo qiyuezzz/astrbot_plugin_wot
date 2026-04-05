@@ -52,23 +52,10 @@ AstrBot 插件，用于查询《坦克世界》玩家效率
 
 对于官方QQ机器人，需要先@机器人，然后再输入命令，例如：`@QQ机器人 效率` 或 `@QQ机器人 /效率`
 
-## 环境要求
+## 说明
 
-本插件使用 Html2Image 库生成战绩报表图片，需要在运行环境中安装浏览器（Chromium/Chrome）。
+- **图片渲染**：通过AstrBot官方T2I服务进行HTML转图片，需要网络连接
+- **字体加载**：使用Google Fonts CDN（fonts.font.im国内镜像）加载中文字体
 
-### Docker环境配置
-
-如果使用AstrBot的Docker容器（基于Debian 13），需要进入容器安装Chromium浏览器：
-
-1. **进入Docker容器**：
-   ```bash
-   docker exec -it <容器名称或ID> /bin/bash
-   ```
-
-2. **换源并安装Chromium**：
-   ```bash
-   sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources && apt update && apt install -y chromium
-   ```
-
-安装完成后，插件即可正常生成战绩报表图片。
+> ⚠️ **注意**：图片生成和字体加载均依赖网络服务，如遇到图片生成失败或字体显示异常，可能与网络连接有关，请检查网络环境后重试。
 

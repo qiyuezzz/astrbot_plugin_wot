@@ -86,7 +86,7 @@ async def _generate_report_data(
             get_arena_list_func=get_arena_list_func,
             func_param=func_param,
         )
-        generate_report(send_id, wot_render_context)
+        await generate_report(send_id, wot_render_context)
     except Exception as exc:
         logger.error(f"获取{title}数据失败（用户{send_id}）：{exc}", exc_info=True)
         raise

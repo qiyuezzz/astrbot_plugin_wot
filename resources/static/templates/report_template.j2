@@ -5,6 +5,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>玩家数据面板</title>
+  <link rel="preconnect" href="https://fonts.font.im">
+  <link rel="preconnect" href="https://fonts.font.im" crossorigin>
+  <link href="https://fonts.font.im/css2?family=Noto+Sans+SC:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
     /* =========================
        基础重置 & 全局
@@ -14,26 +17,20 @@
       padding: 0;
       box-sizing: border-box;
     }
-    @font-face {
-      font-family: 'SourceHanSansSC';
-      src: url('{{ font_url }}') format("truetype");
-      font-weight: 500;
-      font-style: normal;
-      font-display: swap;
-    }
     body {
       background: #f1f3f5;
-      font-family: 'SourceHanSansSC', "Microsoft YaHei", sans-serif;
+      font-family: "Noto Sans SC", "Microsoft YaHei", "PingFang SC", sans-serif;
       font-size: 33px;
       font-weight: 500;
       color: #1a1e22;
       padding: 20px;
       line-height: 1.4;
       text-shadow: 0 0 1px rgba(0,0,0,0.1);
+      width: 2560px;
+      min-height: 2560px;
     }
 
     .container {
-      max-width: 2560px;
       margin: 0 auto;
       background: #fff;
       border-radius: 16px;

@@ -4,28 +4,27 @@ import re
 from functools import lru_cache
 from pathlib import Path
 
-from html2image import Html2Image
 from jinja2 import Environment, FileSystemLoader
 
 from astrbot.api import logger
+from astrbot.core import html_renderer
 from data.plugins.astrbot_plugin_wot.src.domain.report import WotRenderContext
 from data.plugins.astrbot_plugin_wot.src.settings.constants import (
-    font_path,
     report_dir_path,
-    report_image_base_height,
-    report_image_max_height,
-    report_image_min_height,
-    report_image_per_summary_row,
-    report_image_retry_extra_height,
-    report_image_retry_height_scale,
-    report_image_retry_rows_threshold,
-    report_image_width,
     template_dir_path,
     template_path,
+    report_image_width,
+    report_image_min_height,
+    report_image_base_height,
+    report_image_per_summary_row,
+    report_image_max_height,
+    report_image_retry_rows_threshold,
+    report_image_retry_height_scale,
+    report_image_retry_extra_height,
 )
 
 
-def generate_report(
+async def generate_report(
     send_id: str, wot_render_context: WotRenderContext, report_path=None
 ):
     """生成WOT战绩报告。"""
@@ -39,31 +38,33 @@ def generate_report(
         f.write(html_output)
     logger.info(f"HTML文件已保存：{html_file_path}")
 
-    hti = Html2Image(
-        output_path=str(report_dir), custom_flags=["--no-sandbox", "--disable-gpu"]
+    # 使用AstrBot内置的文本转图片功能
+    options = {
+        "full_page": True,
+        "type": "jpeg",
+        "quality": 100,
+        "width": 2560,
+        "height": 2560,
+        "device_scale_factor": 1
+    }
+    # 使用 return_url=True，返回图片的 URL
+    image_url = await html_renderer.render_custom_template(
+        html_output, 
+        {},
+        return_url=True,
+        options=options
     )
-    png_file_name = f"{send_id}.png"
-    table_rows = count_table_rows(html_output)
-    screenshot_size = estimate_screenshot_size(
-        wot_render_context,
-        table_rows=table_rows,
-    )
-    hti.screenshot(
-        html_file=str(html_file_path), save_as=png_file_name, size=screenshot_size
-    )
-    retry_size = estimate_retry_screenshot_size(
-        wot_render_context,
-        screenshot_size,
-        table_rows=table_rows,
-    )
-    if retry_size:
-        logger.info(f"Retrying PNG render with larger size={retry_size}")
-        hti.screenshot(
-            html_file=str(html_file_path), save_as=png_file_name, size=retry_size
-        )
-        screenshot_size = retry_size
-    png_file_path = report_dir / png_file_name
-    logger.info(f"PNG报告生成成功：{png_file_path}，size={screenshot_size}")
+    
+    # 检查 image_url 的值
+    logger.info(f"生成的图片 URL：{image_url}")
+    
+    # 将图片 URL 保存到报告目录，以便后续使用
+    import json
+    url_file_path = report_dir / f"{send_id}.url"
+    with open(url_file_path, "w", encoding="utf-8") as f:
+        json.dump({"url": image_url}, f)
+    
+    logger.info(f"图片 URL 已保存：{url_file_path}")
 
 
 def estimate_screenshot_size(
@@ -122,12 +123,8 @@ def get_report_template():
 
 
 def render_report_html(wot_render_context: WotRenderContext) -> str:
-    font_file = Path(font_path).resolve()
     template = get_report_template()
-    return template.render(
-        ctx=wot_render_context,
-        font_url=str(font_file),
-    )
+    return template.render(ctx=wot_render_context)
 
 
 def format_wot_time(seconds):
