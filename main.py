@@ -73,6 +73,9 @@ class MyPlugin(Star):
                 for method, idx in _REPORT_HANDLERS
             ],
             ([*EFFICIENCY_COMMANDS], self.query_basic_efficiency),
+            (["wot绑定"], self.wot_bind_player_name),
+            (["同步坦克", "更新坦克"], self.sync_full_tank_info),
+            (["帮助", "help"], self.show_help),
         ]
 
         at_text = extract_text_after_leading_at(event.get_messages())
@@ -148,6 +151,26 @@ class MyPlugin(Star):
         """融合官网与 WotInspector 的坦克信息"""
         result = await sync_all_tank_info()
         yield event.plain_result(result)
+
+    @filter.command("帮助", alias={"help"})
+    async def show_help(self, event: AstrMessageEvent):
+        """显示所有可用命令及其说明"""
+        help_text = "坦克世界插件命令列表：\n\n"
+        help_text += "基础命令：\n"
+        help_text += "- wot绑定 [玩家名称]：绑定玩家游戏名称到当前QQ账号\n"
+        help_text += "- 效率/盒子效率 [玩家名称]：查询盒子页面基础效率数据（文本返回）\n\n"
+        help_text += "战绩报表：\n"
+        help_text += "- 今日效率/今日战绩 [玩家名称]：查询今日效率和战绩\n"
+        help_text += "- 昨日效率/昨日战绩 [玩家名称]：查询昨日效率和战绩\n"
+        help_text += "- 两日效率/两日战绩 [玩家名称]：查询两日效率和战绩\n"
+        help_text += "- 三日效率/三日战绩 [玩家名称]：查询三日效率和战绩\n"
+        help_text += "- 百场效率/百场战绩 [玩家名称]：查询百场效率和战绩\n\n"
+        help_text += "管理命令：\n"
+        help_text += "- 同步坦克/更新坦克：融合官网与 WotInspector 的坦克信息\n\n"
+        help_text += "使用说明：\n"
+        help_text += "- 所有命令都支持带/和不带/两种方式，例如：/效率 或 效率\n"
+        help_text += "- 对于官方QQ机器人，需要先@机器人，然后再输入命令\n"
+        yield event.plain_result(help_text)
 
     async def terminate(self):
         """插件销毁时的清理逻辑"""
