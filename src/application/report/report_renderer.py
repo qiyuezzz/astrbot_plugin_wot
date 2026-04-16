@@ -7,21 +7,26 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 
 from astrbot.api import logger
-from astrbot.core import html_renderer
+from data.plugins.astrbot_plugin_wot.src.application.report.h2i_renderer import (
+    H2IRenderer,
+)
 from data.plugins.astrbot_plugin_wot.src.domain.report import WotRenderContext
 from data.plugins.astrbot_plugin_wot.src.settings.constants import (
     report_dir_path,
+    report_image_base_height,
+    report_image_max_height,
+    report_image_min_height,
+    report_image_per_summary_row,
+    report_image_retry_extra_height,
+    report_image_retry_height_scale,
+    report_image_retry_rows_threshold,
+    report_image_width,
     template_dir_path,
     template_path,
-    report_image_width,
-    report_image_min_height,
-    report_image_base_height,
-    report_image_per_summary_row,
-    report_image_max_height,
-    report_image_retry_rows_threshold,
-    report_image_retry_height_scale,
-    report_image_retry_extra_height,
 )
+
+# 全局 H2I 渲染器实例
+_h2i_renderer = H2IRenderer()
 
 
 async def generate_report(
@@ -38,33 +43,19 @@ async def generate_report(
         f.write(html_output)
     logger.info(f"HTML文件已保存：{html_file_path}")
 
-    # 使用AstrBot内置的文本转图片功能
+    # 使用 H2I 渲染器（优先本地渲染，失败时降级到 T2I）
     options = {
         "full_page": True,
         "type": "jpeg",
         "quality": 100,
         "width": 2560,
         "height": 2560,
-        "device_scale_factor": 1
+        "device_scale_factor": 1,
     }
-    # 使用 return_url=True，返回图片的 URL
-    image_url = await html_renderer.render_custom_template(
-        html_output, 
-        {},
-        return_url=True,
-        options=options
+    image_url = await _h2i_renderer.render_report(
+        send_id, html_output, report_dir, options
     )
-    
-    # 检查 image_url 的值
-    logger.info(f"生成的图片 URL：{image_url}")
-    
-    # 将图片 URL 保存到报告目录，以便后续使用
-    import json
-    url_file_path = report_dir / f"{send_id}.url"
-    with open(url_file_path, "w", encoding="utf-8") as f:
-        json.dump({"url": image_url}, f)
-    
-    logger.info(f"图片 URL 已保存：{url_file_path}")
+    logger.info(f"生成的图片 URL: {image_url}")
 
 
 def estimate_screenshot_size(

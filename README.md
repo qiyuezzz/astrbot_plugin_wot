@@ -6,6 +6,7 @@ AstrBot 插件，用于查询《坦克世界》玩家效率
 
 - `main.py`: AstrBot 插件注册与命令入口。
 - `src/application`: 应用层，负责编排命令处理、查询流程和报表流程。
+  - `src/application/report/h2i_renderer.py`: HTML 转图片渲染器（本地优先，远程降级）。
 - `src/domain`: 领域模型与领域枚举。
 - `src/infrastructure`: 基础设施层，包含网络客户端、解析器、仓储与网关实现。
 - `src/infrastructure/api_clients`: API客户端实现。
@@ -13,7 +14,7 @@ AstrBot 插件，用于查询《坦克世界》玩家效率
 - `src/tasks`: 定时任务入口（例如坦克数据同步调度）。
 - `resources/static`: 模板、字体和静态数据。
 - `数据存储`: 绑定数据和坦克数据存储在 `data/plugin_data/astrbot_plugin_wot/data/` 目录下。
-- `运行时产物`: 生成的HTML和PNG报表存储在 `data/temp/astrbot_plugin_wot/report/` 目录下。
+- `运行时产物`: 生成的 HTML 和 JPG 报表存储在 `data/temp/astrbot_plugin_wot/report/` 目录下。
 
 ## 命令说明
 
@@ -54,8 +55,38 @@ AstrBot 插件，用于查询《坦克世界》玩家效率
 
 ## 说明
 
-- **图片渲染**：通过AstrBot官方T2I服务进行HTML转图片，需要网络连接
-- **字体加载**：使用Google Fonts CDN（fonts.font.im国内镜像）加载中文字体
+### 插件配置
 
-> ⚠️ **注意**：图片生成和字体加载均依赖网络服务，如遇到图片生成失败或字体显示异常，可能与网络连接有关，请检查网络环境后重试。
+在 AstrBot 管理面板中可以配置以下选项：
+
+| 配置项 | 说明 | 默认值 |
+|--------|------|--------|
+| 启用本地 HTML 转图片渲染 | 使用 Playwright Chromium 本地渲染图片 | `true` |
+| 报表缓存有效期（秒） | 短时间内重复查询同一玩家时使用缓存 | `60` |
+| 缓存最大条目数 | 缓存的玩家报表数量上限 | `100` |
+
+### 图片渲染
+
+本插件采用**本地优先、远程兜底**的渲染策略：
+
+1. **H2I 本地渲染**（首选）：使用 Playwright Chromium 本地渲染 HTML 为图片
+   - 优点：速度快、稳定、不依赖网络
+   - 首次使用时自动下载 Chromium 浏览器
+   - 使用 npmmirror 镜像加速下载
+
+2. **T2I 远程服务**（降级）：当本地渲染不可用时，使用 AstrBot 官方 T2I 服务
+   - 无需本地安装浏览器
+   - 依赖网络连接
+
+### 依赖说明
+
+- `playwright==1.48.0`：用于本地 HTML 转图片渲染（可选）
+  - 如果未安装，插件会自动降级到 T2I 远程服务
+  - 固定版本确保国内镜像支持
+
+### 字体加载
+
+使用 Google Fonts CDN（fonts.font.im 国内镜像）加载中文字体
+
+> ⚠️ **注意**：T2I 远程服务和字体加载依赖网络，如遇到问题请检查网络环境
 

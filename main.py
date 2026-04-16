@@ -49,9 +49,20 @@ def _make_report_handler(config):
 class MyPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
+        self._load_config()
+
+    def _load_config(self):
+        """加载插件配置"""
+        from data.plugins.astrbot_plugin_wot.src.settings.constants import (
+            set_plugin_config,
+        )
+
+        config = self.context.get_config() or {}
+        set_plugin_config(config)
+        logger.info(f"插件配置已加载: enable_h2i={config.get('enable_h2i', True)}")
 
     async def initialize(self):
-        """插件初始化：启动定时任务并尝试同步坦克数据"""
+        """插件初始化：启动定时任务并同步坦克数据"""
         start_timer_thread()
         try:
             result = await sync_all_tank_info()
@@ -81,10 +92,12 @@ class MyPlugin(Star):
         at_text = extract_text_after_leading_at(event.get_messages())
         if at_text:
             for cmds, handler in routes:
-                if any(at_text.startswith(c) for c in cmds):
-                    async for result in handler(event, message_text=at_text):
-                        yield result
-                    return
+                for c in cmds:
+                    if at_text == c:
+                        async for result in handler(event):
+                            yield result
+                        return
+            return
 
         for cmds, handler in routes:
             if any(
@@ -158,7 +171,9 @@ class MyPlugin(Star):
         help_text = "坦克世界插件命令列表：\n\n"
         help_text += "基础命令：\n"
         help_text += "- wot绑定 [玩家名称]：绑定玩家游戏名称到当前QQ账号\n"
-        help_text += "- 效率/盒子效率 [玩家名称]：查询盒子页面基础效率数据（文本返回）\n\n"
+        help_text += (
+            "- 效率/盒子效率 [玩家名称]：查询盒子页面基础效率数据（文本返回）\n\n"
+        )
         help_text += "战绩报表：\n"
         help_text += "- 今日效率/今日战绩 [玩家名称]：查询今日效率和战绩\n"
         help_text += "- 昨日效率/昨日战绩 [玩家名称]：查询昨日效率和战绩\n"
@@ -174,3 +189,8 @@ class MyPlugin(Star):
 
     async def terminate(self):
         """插件销毁时的清理逻辑"""
+        from data.plugins.astrbot_plugin_wot.src.application.report.report_renderer import (
+            _h2i_renderer,
+        )
+
+        await _h2i_renderer.close()

@@ -1,0 +1,20 @@
+{
+  "enable_h2i": {
+    "description": "启用本地 HTML 转图片渲染",
+    "type": "bool",
+    "hint": "启用后将使用 Playwright Chromium 本地渲染图片，速度更快。如未安装 Playwright 或关闭此选项，将使用 T2I 远程服务。",
+    "default": true
+  },
+  "cache_ttl_seconds": {
+    "description": "报表缓存有效期（秒）",
+    "type": "int",
+    "hint": "短时间内重复查询同一玩家时使用缓存，减少 API 请求",
+    "default": 60
+  },
+  "cache_max_entries": {
+    "description": "缓存最大条目数",
+    "type": "int",
+    "hint": "缓存的玩家报表数量上限",
+    "default": 100
+  }
+}

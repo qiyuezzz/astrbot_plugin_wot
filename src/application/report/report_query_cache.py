@@ -8,8 +8,8 @@ from typing import Any
 
 from astrbot.api import logger
 from data.plugins.astrbot_plugin_wot.src.settings.constants import (
-    report_query_cache_max_entries,
-    report_query_cache_ttl_seconds,
+    get_cache_max_entries,
+    get_cache_ttl_seconds,
     report_query_inflight_wait_timeout_seconds,
 )
 
@@ -49,7 +49,7 @@ def get_cached_report_context(cache_key: ReportCacheKey):
             return None
 
         timestamp, context = item
-        if time.time() - timestamp > report_query_cache_ttl_seconds:
+        if time.time() - timestamp > get_cache_ttl_seconds():
             REPORT_CONTEXT_CACHE.pop(cache_key, None)
             return None
         return context
@@ -58,7 +58,7 @@ def get_cached_report_context(cache_key: ReportCacheKey):
 def set_cached_report_context(cache_key: ReportCacheKey, context) -> None:
     with REPORT_CONTEXT_CACHE_LOCK:
         REPORT_CONTEXT_CACHE[cache_key] = (time.time(), context)
-        if len(REPORT_CONTEXT_CACHE) <= report_query_cache_max_entries:
+        if len(REPORT_CONTEXT_CACHE) <= get_cache_max_entries():
             return
 
         oldest_key = min(REPORT_CONTEXT_CACHE.items(), key=lambda item: item[1][0])[0]

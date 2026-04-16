@@ -18,6 +18,7 @@ def extract_arg_after_command(message_str: str, commands: list[str]) -> str:
                 return after_cmd
     return ""
 
+
 def extract_at_target_id(message_chain: list, self_id: str | None = None) -> str:
     """从消息链中提取 @目标用户ID，排除 @机器人自身"""
     for item in message_chain:

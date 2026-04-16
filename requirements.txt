@@ -1,3 +1,5 @@
 bs4>=0.0.2
 jinja2>=3.1.6
 schedule>=1.2.2
+# playwright 用于本地 HTML 转图片渲染（可选，未安装时自动降级到 T2I 远程服务）
+playwright==1.48.0

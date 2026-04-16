@@ -1,4 +1,5 @@
 import os
+from typing import Any
 
 from data.plugins.astrbot_plugin_wot.src.settings.storage import (
     get_bind_data_path,
@@ -8,6 +9,26 @@ from data.plugins.astrbot_plugin_wot.src.settings.storage import (
     get_plugin_temp_dir,
     get_tank_info_path,
 )
+
+# 插件配置（从 WebUI 加载）
+_plugin_config: dict[str, Any] = {}
+
+
+def set_plugin_config(config: dict[str, Any]) -> None:
+    """设置插件配置"""
+    global _plugin_config
+    _plugin_config = config
+
+
+def get_plugin_config() -> dict[str, Any]:
+    """获取插件配置"""
+    return _plugin_config
+
+
+def is_h2i_enabled() -> bool:
+    """检查是否启用 H2I 本地渲染"""
+    return _plugin_config.get("enable_h2i", True)
+
 
 PLUGIN_DIR = get_plugin_package_dir()
 RESOURCES_DIR = get_plugin_resources_dir()
@@ -56,6 +77,23 @@ report_image_max_height = _env_int("WOT_REPORT_IMAGE_MAX_HEIGHT", 12000)
 report_image_retry_rows_threshold = _env_int("WOT_REPORT_RETRY_ROWS_THRESHOLD", 80)
 report_image_retry_height_scale = _env_float("WOT_REPORT_RETRY_HEIGHT_SCALE", 1.25)
 report_image_retry_extra_height = _env_int("WOT_REPORT_RETRY_EXTRA_HEIGHT", 600)
+
+
+def get_cache_ttl_seconds() -> int:
+    """获取缓存 TTL（优先从插件配置读取）"""
+    return _plugin_config.get(
+        "cache_ttl_seconds",
+        _env_int("WOT_REPORT_CACHE_TTL_SECONDS", 45),
+    )
+
+
+def get_cache_max_entries() -> int:
+    """获取缓存最大条目数（优先从插件配置读取）"""
+    return _plugin_config.get(
+        "cache_max_entries",
+        _env_int("WOT_REPORT_CACHE_MAX_ENTRIES", 128),
+    )
+
 
 # 报表上下文缓存（减少短时间重复请求）
 report_query_cache_ttl_seconds = _env_int("WOT_REPORT_CACHE_TTL_SECONDS", 45)
