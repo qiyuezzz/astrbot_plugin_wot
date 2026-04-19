@@ -32,10 +32,11 @@ _REPORT_HANDLERS = [
 ]
 
 
-def _make_report_handler(config):
+def _make_report_handler(config, plugin_instance):
     """生成报表查询处理器"""
 
     async def _handler(event: AstrMessageEvent, message_text: str | None = None):
+        plugin_instance._load_config()
         input = CommandInput.from_event(event, config.aliases, message_text)
         chain = await build_report_response(
             input, lambda sid, name: query_report(sid, config, name)
@@ -53,13 +54,19 @@ class MyPlugin(Star):
 
     def _load_config(self):
         """加载插件配置"""
+        from astrbot.core.star.star import star_map
         from data.plugins.astrbot_plugin_wot.src.settings.constants import (
             set_plugin_config,
         )
 
-        config = self.context.get_config() or {}
+        metadata = star_map.get(__name__)
+        config = {}
+        if metadata and metadata.config:
+            config = dict(metadata.config)
         set_plugin_config(config)
-        logger.info(f"插件配置已加载: enable_h2i={config.get('enable_h2i', True)}")
+        logger.info(
+            f"插件配置已加载: enable_h2i={config.get('enable_h2i')}, full_config={config}"
+        )
 
     async def initialize(self):
         """插件初始化：启动定时任务并同步坦克数据"""
@@ -86,7 +93,7 @@ class MyPlugin(Star):
             ([*EFFICIENCY_COMMANDS], self.query_basic_efficiency),
             (["wot绑定"], self.wot_bind_player_name),
             (["同步坦克", "更新坦克"], self.sync_full_tank_info),
-            (["帮助", "help"], self.show_help),
+            (["帮助"], self.show_help),
         ]
 
         at_text = extract_text_after_leading_at(event.get_messages())
@@ -128,35 +135,45 @@ class MyPlugin(Star):
     async def query_today_report(
         self, event: AstrMessageEvent, message_text: str | None = None
     ):
-        async for ret in _make_report_handler(REPORT_CONFIGS[0])(event, message_text):
+        async for ret in _make_report_handler(REPORT_CONFIGS[0], self)(
+            event, message_text
+        ):
             yield ret
 
     @filter.command("昨日效率", alias={"昨日战绩"})
     async def query_yesterday_report(
         self, event: AstrMessageEvent, message_text: str | None = None
     ):
-        async for ret in _make_report_handler(REPORT_CONFIGS[1])(event, message_text):
+        async for ret in _make_report_handler(REPORT_CONFIGS[1], self)(
+            event, message_text
+        ):
             yield ret
 
     @filter.command("两日效率", alias={"两日战绩"})
     async def query_two_days_report(
         self, event: AstrMessageEvent, message_text: str | None = None
     ):
-        async for ret in _make_report_handler(REPORT_CONFIGS[2])(event, message_text):
+        async for ret in _make_report_handler(REPORT_CONFIGS[2], self)(
+            event, message_text
+        ):
             yield ret
 
     @filter.command("三日效率", alias={"三日战绩"})
     async def query_three_days_report(
         self, event: AstrMessageEvent, message_text: str | None = None
     ):
-        async for ret in _make_report_handler(REPORT_CONFIGS[3])(event, message_text):
+        async for ret in _make_report_handler(REPORT_CONFIGS[3], self)(
+            event, message_text
+        ):
             yield ret
 
     @filter.command("百场效率", alias={"百场战绩"})
     async def query_hundred_report(
         self, event: AstrMessageEvent, message_text: str | None = None
     ):
-        async for ret in _make_report_handler(REPORT_CONFIGS[4])(event, message_text):
+        async for ret in _make_report_handler(REPORT_CONFIGS[4], self)(
+            event, message_text
+        ):
             yield ret
 
     @filter.command("同步坦克", alias={"更新坦克"})
@@ -165,7 +182,7 @@ class MyPlugin(Star):
         result = await sync_all_tank_info()
         yield event.plain_result(result)
 
-    @filter.command("帮助", alias={"help"})
+    @filter.command("帮助")
     async def show_help(self, event: AstrMessageEvent):
         """显示所有可用命令及其说明"""
         help_text = "坦克世界插件命令列表：\n\n"

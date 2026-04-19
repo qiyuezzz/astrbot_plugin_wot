@@ -74,7 +74,6 @@ async def build_report_response(
     async def _query(name: str) -> MessageChain:
         await report_fn(input.send_id, name)
 
-        # 优先检查 H2I 本地渲染的 .jpg 文件
         jpg_path = Path(report_dir_path) / f"{input.send_id}.jpg"
         if jpg_path.exists():
             logger.info(f"使用 H2I 本地图片: {jpg_path}")
@@ -83,7 +82,6 @@ async def build_report_response(
                 Comp.Image.fromFileSystem(str(jpg_path)),
             ]
 
-        # 降级到 T2I 远程渲染的 .url 文件
         url_file_path = Path(report_dir_path) / f"{input.send_id}.url"
         if not url_file_path.exists():
             logger.error(f"URL 文件不存在: {url_file_path}")

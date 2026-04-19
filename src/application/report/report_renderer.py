@@ -25,14 +25,14 @@ from data.plugins.astrbot_plugin_wot.src.settings.constants import (
     template_path,
 )
 
-# 全局 H2I 渲染器实例
 _h2i_renderer = H2IRenderer()
 
 
 async def generate_report(
-    send_id: str, wot_render_context: WotRenderContext, report_path=None
-):
-    """生成WOT战绩报告。"""
+    send_id: str,
+    wot_render_context: WotRenderContext,
+) -> str:
+    """生成WOT战绩报告，返回图片 URL"""
     report_dir = Path(report_dir_path).resolve()
     report_dir.mkdir(parents=True, exist_ok=True)
 
@@ -43,7 +43,6 @@ async def generate_report(
         f.write(html_output)
     logger.info(f"HTML文件已保存：{html_file_path}")
 
-    # 使用 H2I 渲染器（优先本地渲染，失败时降级到 T2I）
     options = {
         "full_page": True,
         "type": "jpeg",
@@ -52,10 +51,12 @@ async def generate_report(
         "height": 2560,
         "device_scale_factor": 1,
     }
+
     image_url = await _h2i_renderer.render_report(
         send_id, html_output, report_dir, options
     )
     logger.info(f"生成的图片 URL: {image_url}")
+    return image_url
 
 
 def estimate_screenshot_size(

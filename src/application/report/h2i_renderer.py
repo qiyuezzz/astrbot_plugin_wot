@@ -24,9 +24,9 @@ CHROMIUM_LAUNCH_ARGS = [
 
 
 async def _install_chromium() -> bool:
-    """安装 Chromium 浏览器（使用 npmmirror 镜像加速）。"""
+    """安装 Chromium（使用 npmmirror 镜像加速）。"""
     try:
-        logger.info("H2I: 正在下载 Chromium 浏览器...")
+        logger.info("H2I: 正在下载 Chromium 浏览器，请耐心等待...")
         proc = await asyncio.create_subprocess_exec(
             sys.executable,
             "-m",
@@ -43,7 +43,7 @@ async def _install_chromium() -> bool:
         stdout, stderr = await proc.communicate()
 
         if proc.returncode == 0:
-            logger.info("H2I: Chromium 浏览器下载完成")
+            logger.info("H2I: Chromium 浏览器下载完成，本地渲染已就绪")
             return True
         else:
             error_msg = stderr.decode("utf-8", errors="replace")
@@ -73,7 +73,7 @@ class H2IRenderer:
             if self._initialized:
                 return self._h2i_available
 
-            # 尝试启动浏览器
+            logger.info("H2I: 正在初始化本地渲染引擎...")
             try:
                 from playwright.async_api import async_playwright
 
@@ -83,19 +83,18 @@ class H2IRenderer:
                 )
                 self._initialized = True
                 self._h2i_available = True
-                logger.info("H2I: Playwright Chromium 浏览器已启动")
+                logger.info("H2I: 本地渲染引擎已就绪")
                 return True
             except ImportError:
-                logger.warning("H2I: playwright 导入失败，将使用 T2I 远程服务")
+                logger.warning("H2I: playwright 未安装，将使用 T2I 远程服务")
+                logger.info("H2I: 如需本地渲染，请运行: pip install playwright")
                 self._initialized = True
                 self._h2i_available = False
                 return False
             except Exception as e:
-                # 浏览器未下载，尝试自动安装
                 if "Executable doesn't exist" in str(e):
-                    logger.info("H2I: 检测到 Chromium 未下载，开始自动安装...")
+                    logger.info("H2I: 首次启用本地渲染，正在下载 Chromium...")
                     if await _install_chromium():
-                        # 安装成功，再次尝试启动
                         try:
                             if self._playwright is None:
                                 self._playwright = await async_playwright().start()
@@ -104,14 +103,12 @@ class H2IRenderer:
                             )
                             self._initialized = True
                             self._h2i_available = True
-                            logger.info("H2I: Playwright Chromium 浏览器已启动")
+                            logger.info("H2I: 本地渲染引擎已就绪")
                             return True
                         except Exception as e2:
                             logger.warning(f"H2I: 浏览器启动失败: {e2}")
                     else:
-                        logger.warning(
-                            "H2I: Chromium 自动安装失败，将使用 T2I 远程服务"
-                        )
+                        logger.warning("H2I: Chromium 下载失败，将使用 T2I 远程服务")
                 else:
                     logger.warning(f"H2I: 启动浏览器失败: {e}")
 
@@ -127,7 +124,9 @@ class H2IRenderer:
         options: dict | None = None,
     ) -> str:
         """渲染报表 HTML 为图片。"""
-        if is_h2i_enabled() and await self._ensure_browser():
+        h2i_enabled = is_h2i_enabled()
+        logger.info(f"H2I: is_h2i_enabled={h2i_enabled}")
+        if h2i_enabled and await self._ensure_browser():
             try:
                 return await self._render_with_playwright(
                     html_output, report_dir, send_id, options

@@ -1,4 +1,6 @@
+import json
 import os
+from pathlib import Path
 from typing import Any
 
 from data.plugins.astrbot_plugin_wot.src.settings.storage import (
@@ -10,7 +12,6 @@ from data.plugins.astrbot_plugin_wot.src.settings.storage import (
     get_tank_info_path,
 )
 
-# 插件配置（从 WebUI 加载）
 _plugin_config: dict[str, Any] = {}
 
 
@@ -25,9 +26,27 @@ def get_plugin_config() -> dict[str, Any]:
     return _plugin_config
 
 
+def _load_config_from_file() -> dict[str, Any]:
+    """从配置文件直接读取配置"""
+    from astrbot.core.utils.astrbot_path import get_astrbot_config_path
+
+    config_path = Path(get_astrbot_config_path()) / "astrbot_plugin_wot_config.json"
+    if config_path.exists():
+        try:
+            with open(config_path, encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
 def is_h2i_enabled() -> bool:
-    """检查是否启用 H2I 本地渲染"""
-    return _plugin_config.get("enable_h2i", True)
+    """检查是否启用 H2I 本地渲染（动态读取配置）"""
+    config = _plugin_config or _load_config_from_file()
+    value = config.get("enable_h2i", False)
+    if isinstance(value, str):
+        value = value.lower() in ("true", "1", "yes")
+    return bool(value)
 
 
 PLUGIN_DIR = get_plugin_package_dir()
