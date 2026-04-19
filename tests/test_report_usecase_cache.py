@@ -1,6 +1,4 @@
 import asyncio
-import threading
-import time
 
 import pytest
 
@@ -18,6 +16,16 @@ from data.plugins.astrbot_plugin_wot.src.domain.report import (
     PlayerStats,
     WotRenderContext,
 )
+from data.plugins.astrbot_plugin_wot.src.settings import constants
+
+
+@pytest.fixture(autouse=True)
+def _clear_cache_state():
+    clear_report_context_cache()
+    clear_report_context_inflight()
+    yield
+    clear_report_context_cache()
+    clear_report_context_inflight()
 
 
 def _build_context(name: str) -> WotRenderContext:
@@ -49,9 +57,7 @@ def _build_context(name: str) -> WotRenderContext:
 
 
 def test_report_context_cache_hit(monkeypatch):
-    clear_report_context_cache()
-    clear_report_context_inflight()
-    monkeypatch.setattr(report_query_cache, "report_query_cache_ttl_seconds", 60)
+    monkeypatch.setattr(report_query_cache, "get_cache_ttl_seconds", lambda: 60)
     key = ("Tester", "今日战绩", "get_arena_list_by_days", 1)
     context = _build_context("Tester")
     set_cached_report_context(key, context)
@@ -61,9 +67,7 @@ def test_report_context_cache_hit(monkeypatch):
 
 
 def test_report_context_cache_expired(monkeypatch):
-    clear_report_context_cache()
-    clear_report_context_inflight()
-    monkeypatch.setattr(report_query_cache, "report_query_cache_ttl_seconds", 1)
+    monkeypatch.setattr(report_query_cache, "get_cache_ttl_seconds", lambda: 1)
     key = ("Tester", "今日战绩", "get_arena_list_by_days", 1)
     context = _build_context("Tester")
     set_cached_report_context(key, context)
@@ -78,10 +82,8 @@ def test_report_context_cache_expired(monkeypatch):
 
 
 def test_report_context_cache_prunes_oldest(monkeypatch):
-    clear_report_context_cache()
-    clear_report_context_inflight()
-    monkeypatch.setattr(report_query_cache, "report_query_cache_max_entries", 2)
-    monkeypatch.setattr(report_query_cache, "report_query_cache_ttl_seconds", 60)
+    monkeypatch.setattr(report_query_cache, "get_cache_max_entries", lambda: 2)
+    monkeypatch.setattr(report_query_cache, "get_cache_ttl_seconds", lambda: 60)
 
     key1 = ("P1", "今日战绩", "days", 1)
     key2 = ("P2", "今日战绩", "days", 1)
@@ -103,8 +105,6 @@ def test_report_context_cache_prunes_oldest(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_inflight_dedupe_builds_once_for_same_key(monkeypatch):
-    clear_report_context_cache()
-    clear_report_context_inflight()
     monkeypatch.setattr(
         report_query_cache, "report_query_inflight_wait_timeout_seconds", 5
     )
@@ -129,8 +129,6 @@ async def test_inflight_dedupe_builds_once_for_same_key(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_inflight_dedupe_propagates_build_error(monkeypatch):
-    clear_report_context_cache()
-    clear_report_context_inflight()
     monkeypatch.setattr(
         report_query_cache, "report_query_inflight_wait_timeout_seconds", 5
     )
@@ -151,3 +149,15 @@ async def test_inflight_dedupe_propagates_build_error(monkeypatch):
 
     assert len(errors) == 2
     assert all("boom" in message for message in errors)
+
+
+def test_cache_config_falls_back_to_file(monkeypatch):
+    monkeypatch.setattr(constants, "_plugin_config", {})
+    monkeypatch.setattr(
+        constants,
+        "_load_config_from_file",
+        lambda: {"cache_ttl_seconds": 90, "cache_max_entries": 12},
+    )
+
+    assert constants.get_cache_ttl_seconds() == 90
+    assert constants.get_cache_max_entries() == 12

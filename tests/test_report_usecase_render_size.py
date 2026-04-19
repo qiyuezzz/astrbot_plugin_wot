@@ -74,8 +74,12 @@ def test_estimate_retry_size_returns_none_when_below_threshold():
 
 def test_estimate_retry_size_returns_larger_height_when_needed():
     context = _build_context(summary_rows=report_image_retry_rows_threshold + 8)
-    current = estimate_screenshot_size(context, table_rows=report_image_retry_rows_threshold + 8)
-    retry = estimate_retry_screenshot_size(context, current, table_rows=report_image_retry_rows_threshold + 8)
+    current = estimate_screenshot_size(
+        context, table_rows=report_image_retry_rows_threshold + 8
+    )
+    retry = estimate_retry_screenshot_size(
+        context, current, table_rows=report_image_retry_rows_threshold + 8
+    )
     assert retry is not None
     assert retry[0] == current[0]
     assert retry[1] > current[1]

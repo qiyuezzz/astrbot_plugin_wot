@@ -1,4 +1,6 @@
+import json
 from importlib import import_module
+from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -8,21 +10,29 @@ from data.plugins.astrbot_plugin_wot.main import MyPlugin
 from data.plugins.astrbot_plugin_wot.src.application.efficiency_service import (
     get_basic_efficiency_text,
 )
+from data.plugins.astrbot_plugin_wot.src.application.message_parser import CommandInput
 from data.plugins.astrbot_plugin_wot.src.application.player_resolver import (
     resolve_player_name,
 )
-from data.plugins.astrbot_plugin_wot.src.application.message_parser import CommandInput
 from data.plugins.astrbot_plugin_wot.src.application.query_service import (
     build_efficiency_response,
+    build_report_response,
 )
 from data.plugins.astrbot_plugin_wot.src.domain.report import PlayerStats
 
 
 class DummyEvent:
-    def __init__(self, sender_id: str, message_str: str, messages: list):
+    def __init__(
+        self,
+        sender_id: str,
+        message_str: str,
+        messages: list,
+        is_at_or_wake_command: bool = False,
+    ):
         self._sender_id = sender_id
         self.message_str = message_str
         self._messages = messages
+        self.is_at_or_wake_command = is_at_or_wake_command
 
     def get_sender_id(self):
         return self._sender_id
@@ -128,7 +138,9 @@ async def test_resolve_player_name_with_explicit_name(monkeypatch: pytest.Monkey
 
 
 @pytest.mark.asyncio
-async def test_resolve_player_name_returns_target_unbound(monkeypatch: pytest.MonkeyPatch):
+async def test_resolve_player_name_returns_target_unbound(
+    monkeypatch: pytest.MonkeyPatch,
+):
     monkeypatch.setattr(
         "data.plugins.astrbot_plugin_wot.src.application.player_resolver.read_binding_data",
         lambda _sender_id: "",
@@ -236,3 +248,57 @@ async def test_get_today_performance_returns_report_chain(
     assert isinstance(results[0][0], Comp.At)
     assert isinstance(results[0][1], Comp.Plain)
     assert results[0][1].text == "report-ok"
+
+
+@pytest.mark.asyncio
+async def test_build_report_response_prefers_newer_url_artifact(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    monkeypatch.setattr(
+        "data.plugins.astrbot_plugin_wot.src.application.query_service.resolve_player_name",
+        AsyncMock(return_value=("Tester", None)),
+    )
+    monkeypatch.setattr(
+        "data.plugins.astrbot_plugin_wot.src.application.query_service.report_dir_path",
+        tmp_path,
+    )
+
+    async def _fake_report(_send_id: str, _name: str | None):
+        jpg_path = tmp_path / "10001.jpg"
+        jpg_path.write_bytes(b"old-jpg")
+        url_file_path = tmp_path / "10001.url"
+        with open(url_file_path, "w", encoding="utf-8") as f:
+            json.dump({"url": "https://example.com/report.jpg"}, f)
+
+    input = CommandInput("10001", [], None)
+    result = await build_report_response(input, _fake_report)
+    assert len(result) == 2
+    assert isinstance(result[0], Comp.At)
+    assert isinstance(result[1], Comp.Image)
+    assert result[1].file == "https://example.com/report.jpg"
+
+
+@pytest.mark.asyncio
+async def test_command_router_handles_zh_help_only(monkeypatch: pytest.MonkeyPatch):
+    async def _fake_show_help(_event):
+        yield "help-ok"
+
+    plugin = MyPlugin(context=MagicMock())
+    monkeypatch.setattr(plugin, "show_help", _fake_show_help)
+
+    zh_event = DummyEvent(
+        sender_id="10001",
+        message_str="帮助",
+        messages=[Comp.Plain("帮助")],
+    )
+    zh_results = [item async for item in plugin.command_router(zh_event)]
+    assert zh_results == ["help-ok"]
+
+    en_event = DummyEvent(
+        sender_id="10001",
+        message_str="help",
+        messages=[Comp.Plain("help")],
+    )
+    en_results = [item async for item in plugin.command_router(en_event)]
+    assert en_results == []

@@ -23,7 +23,7 @@ def set_plugin_config(config: dict[str, Any]) -> None:
 
 def get_plugin_config() -> dict[str, Any]:
     """获取插件配置"""
-    return _plugin_config
+    return _plugin_config or _load_config_from_file()
 
 
 def _load_config_from_file() -> dict[str, Any]:
@@ -42,7 +42,7 @@ def _load_config_from_file() -> dict[str, Any]:
 
 def is_h2i_enabled() -> bool:
     """检查是否启用 H2I 本地渲染（动态读取配置）"""
-    config = _plugin_config or _load_config_from_file()
+    config = get_plugin_config()
     value = config.get("enable_h2i", False)
     if isinstance(value, str):
         value = value.lower() in ("true", "1", "yes")
@@ -100,7 +100,7 @@ report_image_retry_extra_height = _env_int("WOT_REPORT_RETRY_EXTRA_HEIGHT", 600)
 
 def get_cache_ttl_seconds() -> int:
     """获取缓存 TTL（优先从插件配置读取）"""
-    return _plugin_config.get(
+    return get_plugin_config().get(
         "cache_ttl_seconds",
         _env_int("WOT_REPORT_CACHE_TTL_SECONDS", 45),
     )
@@ -108,7 +108,7 @@ def get_cache_ttl_seconds() -> int:
 
 def get_cache_max_entries() -> int:
     """获取缓存最大条目数（优先从插件配置读取）"""
-    return _plugin_config.get(
+    return get_plugin_config().get(
         "cache_max_entries",
         _env_int("WOT_REPORT_CACHE_MAX_ENTRIES", 128),
     )

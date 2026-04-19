@@ -75,14 +75,18 @@ async def build_report_response(
         await report_fn(input.send_id, name)
 
         jpg_path = Path(report_dir_path) / f"{input.send_id}.jpg"
-        if jpg_path.exists():
+        url_file_path = Path(report_dir_path) / f"{input.send_id}.url"
+
+        if jpg_path.exists() and (
+            not url_file_path.exists()
+            or jpg_path.stat().st_mtime >= url_file_path.stat().st_mtime
+        ):
             logger.info(f"使用 H2I 本地图片: {jpg_path}")
             return [
                 Comp.At(qq=input.send_id),
                 Comp.Image.fromFileSystem(str(jpg_path)),
             ]
 
-        url_file_path = Path(report_dir_path) / f"{input.send_id}.url"
         if not url_file_path.exists():
             logger.error(f"URL 文件不存在: {url_file_path}")
             raise ValueError("生成图片失败，请稍后再试")

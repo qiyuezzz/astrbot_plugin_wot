@@ -124,6 +124,7 @@ class H2IRenderer:
         options: dict | None = None,
     ) -> str:
         """渲染报表 HTML 为图片。"""
+        self._clear_previous_artifacts(report_dir, send_id)
         h2i_enabled = is_h2i_enabled()
         logger.info(f"H2I: is_h2i_enabled={h2i_enabled}")
         if h2i_enabled and await self._ensure_browser():
@@ -135,6 +136,15 @@ class H2IRenderer:
                 logger.warning(f"H2I 本地渲染失败，降级到 T2I: {e}")
 
         return await self._render_with_t2i(html_output, report_dir, send_id, options)
+
+    def _clear_previous_artifacts(self, report_dir: Path, send_id: str) -> None:
+        """清理同一用户上次渲染遗留的产物，避免误读旧文件。"""
+        for suffix in ("jpg", "url"):
+            artifact_path = report_dir / f"{send_id}.{suffix}"
+            try:
+                artifact_path.unlink(missing_ok=True)
+            except OSError as exc:
+                logger.warning(f"H2I: 清理旧产物失败 {artifact_path}: {exc}")
 
     async def _render_with_playwright(
         self,
