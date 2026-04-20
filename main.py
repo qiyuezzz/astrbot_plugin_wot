@@ -46,7 +46,7 @@ def _make_report_handler(config, plugin_instance):
     return _handler
 
 
-@register("astrbot_plugin_wot", "zzc", "查询坦克世界效率和战绩", "1.0.0")
+@register("astrbot_plugin_wot", "zzc", "查询坦克世界效率和战绩", "v1.1.1")
 class MyPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
@@ -77,7 +77,6 @@ class MyPlugin(Star):
         except Exception as exc:
             logger.warning(f"坦克数据初始化失败（将在后台重试）: {exc}")
 
-    @filter.event_message_type(filter.EventMessageType.ALL)
     @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE)
     async def command_router(self, event: AstrMessageEvent):
         """监听群消息，处理不带 / 前缀的命令"""

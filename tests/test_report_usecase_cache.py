@@ -105,9 +105,7 @@ def test_report_context_cache_prunes_oldest(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_inflight_dedupe_builds_once_for_same_key(monkeypatch):
-    monkeypatch.setattr(
-        report_query_cache, "report_query_inflight_wait_timeout_seconds", 5
-    )
+    monkeypatch.setattr(report_query_cache, "get_inflight_wait_timeout", lambda: 5)
 
     key = ("Tester", "今日战绩", "days", 1)
     calls = {"count": 0}
@@ -129,9 +127,7 @@ async def test_inflight_dedupe_builds_once_for_same_key(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_inflight_dedupe_propagates_build_error(monkeypatch):
-    monkeypatch.setattr(
-        report_query_cache, "report_query_inflight_wait_timeout_seconds", 5
-    )
+    monkeypatch.setattr(report_query_cache, "get_inflight_wait_timeout", lambda: 5)
 
     key = ("Tester", "今日战绩", "days", 1)
     errors: list[str] = []

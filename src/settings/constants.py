@@ -114,9 +114,9 @@ def get_cache_max_entries() -> int:
     )
 
 
-# 报表上下文缓存（减少短时间重复请求）
-report_query_cache_ttl_seconds = _env_int("WOT_REPORT_CACHE_TTL_SECONDS", 45)
-report_query_cache_max_entries = _env_int("WOT_REPORT_CACHE_MAX_ENTRIES", 128)
-report_query_inflight_wait_timeout_seconds = _env_int(
-    "WOT_REPORT_INFLIGHT_WAIT_TIMEOUT_SECONDS", 30
-)
+def get_inflight_wait_timeout() -> int:
+    """获取并发请求等待超时（优先从插件配置读取）"""
+    return get_plugin_config().get(
+        "inflight_wait_timeout_seconds",
+        _env_int("WOT_REPORT_INFLIGHT_WAIT_TIMEOUT_SECONDS", 30),
+    )

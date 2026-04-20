@@ -23,16 +23,98 @@ CHROMIUM_LAUNCH_ARGS = [
 ]
 
 
-async def _install_chromium() -> bool:
-    """安装 Chromium（使用 npmmirror 镜像加速）。"""
+async def _install_system_deps() -> bool:
+    """安装 Chromium 所需的系统依赖（Debian/Ubuntu 系，使用阿里云镜像源加速）。"""
+    # Debian/Ubuntu 所需的依赖包
+    deps = [
+        "libnss3",
+        "libnspr4",
+        "libatk1.0-0",
+        "libatk-bridge2.0-0",
+        "libcups2",
+        "libxcomposite1",
+        "libxdamage1",
+        "libatspi2.0-0",
+        "libdrm2",
+        "libxkbcommon0",
+        "libx11-xcb1",
+        "libxcb1",
+        "libgbm1",
+        "libpango-1.0-0",
+        "libcairo2",
+        "libasound2",
+    ]
+
     try:
+        import shutil
+
+        if not shutil.which("apt-get"):
+            logger.warning("H2I: 未找到 apt-get，仅支持 Debian/Ubuntu 系统")
+            return False
+
+        logger.info("H2I: 正在配置阿里云镜像源并安装系统依赖...")
+
+        # 使用阿里云镜像源替换默认源（加速下载）
+        sources_list = """deb http://mirrors.aliyun.com/debian/ bookworm main contrib non-free non-free-firmware
+deb http://mirrors.aliyun.com/debian/ bookworm-updates main contrib non-free non-free-firmware
+deb http://mirrors.aliyun.com/debian/ bookworm-backports main contrib non-free non-free-firmware
+deb http://mirrors.aliyun.com/debian-security/ bookworm-security main contrib non-free non-free-firmware"""
+
+        # 备份并替换 sources.list
+        proc = await asyncio.create_subprocess_shell(
+            "cp /etc/apt/sources.list /etc/apt/sources.list.bak 2>/dev/null; "
+            f'echo "{sources_list}" > /etc/apt/sources.list',
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        await proc.communicate()
+
+        # 更新包列表
+        proc = await asyncio.create_subprocess_exec(
+            "apt-get",
+            "update",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        await proc.communicate()
+
+        # 安装依赖
+        proc = await asyncio.create_subprocess_exec(
+            "apt-get",
+            "install",
+            "-y",
+            "--no-install-recommends",
+            *deps,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, stderr = await proc.communicate()
+
+        if proc.returncode == 0:
+            logger.info("H2I: 系统依赖安装成功")
+            return True
+        else:
+            error_msg = stderr.decode("utf-8", errors="replace")
+            logger.warning(f"H2I: 系统依赖安装失败: {error_msg}")
+            return False
+    except Exception as e:
+        logger.warning(f"H2I: 安装系统依赖时出错: {e}")
+        return False
+
+
+async def _install_chromium() -> bool:
+    """安装 Chromium 及其系统依赖（使用 npmmirror 镜像加速）。"""
+    try:
+        # 先尝试安装系统依赖
+        await _install_system_deps()
+
         logger.info("H2I: 正在下载 Chromium 浏览器，请耐心等待...")
         proc = await asyncio.create_subprocess_exec(
             sys.executable,
             "-m",
             "playwright",
             "install",
-            "chromium",
+            "chromium",  # 移除 --with-deps，因为我们手动安装了依赖
             env={
                 **os.environ,
                 "PLAYWRIGHT_DOWNLOAD_HOST": "https://npmmirror.com/mirrors/playwright",
@@ -47,10 +129,10 @@ async def _install_chromium() -> bool:
             return True
         else:
             error_msg = stderr.decode("utf-8", errors="replace")
-            logger.error(f"H2I: Chromium 下载失败: {error_msg}")
+            logger.error(f"H2I: Chromium 安装失败: {error_msg}")
             return False
     except Exception as e:
-        logger.error(f"H2I: 下载 Chromium 时发生错误: {e}")
+        logger.error(f"H2I: 安装 Chromium 时发生错误: {e}")
         return False
 
 

@@ -16,5 +16,11 @@
     "type": "int",
     "hint": "缓存的玩家报表数量上限",
     "default": 100
+  },
+  "inflight_wait_timeout_seconds": {
+    "description": "并发请求等待超时（秒）",
+    "type": "int",
+    "hint": "当多个用户同时查询同一玩家时，等待其他请求完成的最大时间",
+    "default": 30
   }
 }

@@ -10,7 +10,7 @@ from astrbot.api import logger
 from data.plugins.astrbot_plugin_wot.src.settings.constants import (
     get_cache_max_entries,
     get_cache_ttl_seconds,
-    report_query_inflight_wait_timeout_seconds,
+    get_inflight_wait_timeout,
 )
 
 ReportCacheKey = tuple[str, str, str, int]
@@ -81,7 +81,7 @@ async def run_with_inflight_dedupe(
         try:
             finished = await asyncio.wait_for(
                 inflight.event.wait(),
-                timeout=max(1, report_query_inflight_wait_timeout_seconds),
+                timeout=max(1, get_inflight_wait_timeout()),
             )
         except (TimeoutError, asyncio.TimeoutError):
             logger.warning(f"等待同 key 渲染超时，退化为独立构建：{cache_key}")
