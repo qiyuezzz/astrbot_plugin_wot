@@ -1,10 +1,4 @@
 {
-  "enable_h2i": {
-    "description": "启用本地 HTML 转图片渲染",
-    "type": "bool",
-    "hint": "开启后首次使用会自动下载 Chromium 浏览器，渲染速度更快。关闭则使用 T2I 远程服务。",
-    "default": false
-  },
   "cache_ttl_seconds": {
     "description": "报表缓存有效期（秒）",
     "type": "int",

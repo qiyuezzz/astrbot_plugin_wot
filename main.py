@@ -64,9 +64,7 @@ class MyPlugin(Star):
         if metadata and metadata.config:
             config = dict(metadata.config)
         set_plugin_config(config)
-        logger.info(
-            f"插件配置已加载: enable_h2i={config.get('enable_h2i')}, full_config={config}"
-        )
+        logger.info(f"插件配置已加载: {config}")
 
     async def initialize(self):
         """插件初始化：启动定时任务并同步坦克数据"""
@@ -205,8 +203,4 @@ class MyPlugin(Star):
 
     async def terminate(self):
         """插件销毁时的清理逻辑"""
-        from data.plugins.astrbot_plugin_wot.src.application.report.report_renderer import (
-            _h2i_renderer,
-        )
-
-        await _h2i_renderer.close()
+        pass

@@ -40,14 +40,6 @@ def _load_config_from_file() -> dict[str, Any]:
     return {}
 
 
-def is_h2i_enabled() -> bool:
-    """检查是否启用 H2I 本地渲染（动态读取配置）"""
-    config = get_plugin_config()
-    value = config.get("enable_h2i", False)
-    if isinstance(value, str):
-        value = value.lower() in ("true", "1", "yes")
-    return bool(value)
-
 
 PLUGIN_DIR = get_plugin_package_dir()
 RESOURCES_DIR = get_plugin_resources_dir()

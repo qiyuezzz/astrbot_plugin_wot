@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from functools import lru_cache
 from pathlib import Path
@@ -7,9 +8,7 @@ from pathlib import Path
 from jinja2 import Environment, FileSystemLoader
 
 from astrbot.api import logger
-from data.plugins.astrbot_plugin_wot.src.application.report.h2i_renderer import (
-    H2IRenderer,
-)
+from astrbot.core import html_renderer
 from data.plugins.astrbot_plugin_wot.src.domain.report import WotRenderContext
 from data.plugins.astrbot_plugin_wot.src.settings.constants import (
     report_dir_path,
@@ -24,8 +23,6 @@ from data.plugins.astrbot_plugin_wot.src.settings.constants import (
     template_dir_path,
     template_path,
 )
-
-_h2i_renderer = H2IRenderer()
 
 
 async def generate_report(
@@ -52,10 +49,16 @@ async def generate_report(
         "device_scale_factor": 1,
     }
 
-    image_url = await _h2i_renderer.render_report(
-        send_id, html_output, report_dir, options
+    image_url = await html_renderer.render_custom_template(
+        html_output, {}, return_url=True, options=options
     )
-    logger.info(f"生成的图片 URL: {image_url}")
+    logger.info(f"T2I 生成的图片 URL: {image_url}")
+
+    url_file_path = report_dir / f"{send_id}.url"
+    with open(url_file_path, "w", encoding="utf-8") as f:
+        json.dump({"url": image_url}, f)
+    logger.info(f"T2I 图片 URL 已保存: {url_file_path}")
+
     return image_url
 
 
