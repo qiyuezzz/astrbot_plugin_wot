@@ -46,7 +46,7 @@ def _make_report_handler(config, plugin_instance):
     return _handler
 
 
-@register("astrbot_plugin_wot", "zzc", "查询坦克世界效率和战绩", "v1.1.1")
+@register("astrbot_plugin_wot", "zzc", "查询坦克世界效率和战绩", "v1.2.0")
 class MyPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
