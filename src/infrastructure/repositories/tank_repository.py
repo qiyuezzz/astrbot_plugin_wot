@@ -86,19 +86,58 @@ def _normalize_tank_name(name: str) -> str:
     return " ".join(name.strip().lower().split())
 
 
-def find_tank_by_name(tank_name: str) -> Tank | None:
-    """按坦克名查找坦克，支持去引号容错（例如输入 鞭蛇 匹配 "鞭蛇"）。"""
+def _tank_name_aliases(name: str) -> set[str]:
+    """生成可用于精确匹配的名称别名。"""
+    normalized = _normalize_tank_name(name)
+    if not normalized:
+        return set()
+    aliases = {normalized}
+    if normalized.endswith("式"):
+        aliases.add(normalized[:-1])
+    return aliases
+
+
+def find_tanks_by_name(tank_name: str) -> list[Tank]:
+    """按坦克名查找所有候选，精确名称和别名优先于部分匹配。"""
     if not tank_name:
-        return None
+        return []
     tank_db = _load_tank_db()
     if tank_name in tank_db:
-        return get_tank_info_by_name(tank_name)
+        return [get_tank_info_by_name(tank_name)]
 
     normalized = _normalize_tank_name(tank_name)
+    if not normalized:
+        return []
+
+    normalized_names: dict[str, set[str]] = {}
+    exact_matches: list[str] = []
     for candidate, payload in tank_db.items():
         payload_name = payload.get("name", "") if isinstance(payload, dict) else ""
-        if _normalize_tank_name(candidate) == normalized or _normalize_tank_name(
-            payload_name
-        ) == normalized:
-            return get_tank_info_by_name(candidate)
-    return None
+        canonical_names = {
+            name
+            for name in (
+                _normalize_tank_name(candidate),
+                _normalize_tank_name(payload_name),
+            )
+            if name
+        }
+        names = _tank_name_aliases(candidate) | _tank_name_aliases(payload_name)
+        if normalized in canonical_names:
+            exact_matches.append(candidate)
+        normalized_names[candidate] = names
+
+    if exact_matches:
+        return [get_tank_info_by_name(candidate) for candidate in exact_matches]
+
+    contains_matches = [
+        candidate
+        for candidate, names in normalized_names.items()
+        if any(normalized in name for name in names)
+    ]
+    return [get_tank_info_by_name(candidate) for candidate in contains_matches]
+
+
+def find_tank_by_name(tank_name: str) -> Tank | None:
+    """兼容单结果调用；多候选时返回 None。"""
+    matches = find_tanks_by_name(tank_name)
+    return matches[0] if len(matches) == 1 else None

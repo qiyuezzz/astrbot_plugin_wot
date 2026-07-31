@@ -10,7 +10,7 @@ from data.plugins.astrbot_plugin_wot.src.infrastructure.api_clients.wotbox_camp_
     fetch_moe_ranking,
 )
 from data.plugins.astrbot_plugin_wot.src.infrastructure.repositories.tank_repository import (
-    find_tank_by_name,
+    find_tanks_by_name,
 )
 
 _MOE_CACHE_TTL_SECONDS = 6 * 60 * 60
@@ -39,11 +39,7 @@ def _format_moe(tank: Tank, values: dict[int, int]) -> str:
     return "\n".join(lines)
 
 
-async def build_moe_text(tank_name: str) -> str:
-    """查询指定坦克的一环/二环/三环标伤阈值（结果缓存 6 小时）。"""
-    tank = find_tank_by_name(tank_name)
-    if tank is None:
-        return f"未找到坦克「{tank_name}」，请检查名称是否正确"
+async def _build_moe_text(tank: Tank) -> str:
     if tank.type is TankTypeEnum.UNKNOWN or not tank.tier or not tank.vehicle_cd:
         return f"坦克「{_clean_name(tank.name)}」数据不完整，请先执行 同步坦克"
 
@@ -75,7 +71,9 @@ async def build_moe_text(tank_name: str) -> str:
             values[percentile] = int(entry["mastery"])
 
     if len(values) < len(_PERCENTILES):
-        raise ValueError(f"未查询到坦克「{_clean_name(tank.name)}」的完整环线数据")
+        tank_display_name = _clean_name(tank.name)
+        logger.warning(f"未查询到坦克「{tank_display_name}」的完整环线数据")
+        return f"{tank_display_name}：暂无完整环线数据（近7天）"
 
     text = _format_moe(tank, values)
     with _moe_lock:
@@ -83,3 +81,13 @@ async def build_moe_text(tank_name: str) -> str:
             _moe_cache.clear()
         _moe_cache[cache_key] = (time.time(), text)
     return text
+
+
+async def build_moe_text(tank_name: str) -> str:
+    """查询名称匹配的坦克环线，多个候选之间用空行分隔。"""
+    tanks = find_tanks_by_name(tank_name)
+    if not tanks:
+        return f"未找到坦克「{tank_name}」，请检查名称是否正确"
+
+    texts = await asyncio.gather(*(_build_moe_text(tank) for tank in tanks))
+    return "\n\n".join(texts)
