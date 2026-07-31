@@ -7,6 +7,9 @@ from astrbot.api import logger
 from data.plugins.astrbot_plugin_wot.src.application.tank_sync_service import (
     sync_all_tank_info,
 )
+from data.plugins.astrbot_plugin_wot.src.infrastructure.network.http_client import (
+    close_shared_session,
+)
 
 _scheduler_started = False
 _scheduler_thread: threading.Thread | None = None
@@ -15,6 +18,8 @@ _scheduler_stop = threading.Event()
 
 def run_scheduler():
     """运行定时任务调度器"""
+
+    task_scheduler = schedule.Scheduler()
 
     def daily_task():
         """每日定时任务：同步坦克信息"""
@@ -27,15 +32,19 @@ def run_scheduler():
                 result = loop.run_until_complete(sync_all_tank_info())
                 logger.info(f"每日任务完成: {result}")
             finally:
-                loop.close()
+                try:
+                    loop.run_until_complete(close_shared_session())
+                finally:
+                    asyncio.set_event_loop(None)
+                    loop.close()
         except Exception as e:
             logger.error(f"每日任务执行失败: {e}")
 
-    schedule.every().day.at("10:00").do(daily_task)
+    task_scheduler.every().day.at("10:00").do(daily_task)
     logger.info("定时任务调度器已启动，下次执行时间: 明天 10:00")
 
     while not _scheduler_stop.is_set():
-        schedule.run_pending()
+        task_scheduler.run_pending()
         if _scheduler_stop.wait(60):  # 60 秒检查一次，降低 CPU 占用
             break
 
@@ -64,6 +73,9 @@ def stop_timer_thread():
     if _scheduler_thread and _scheduler_thread.is_alive():
         _scheduler_stop.set()
         _scheduler_thread.join(timeout=5)
+        if _scheduler_thread.is_alive():
+            logger.warning("定时任务仍在执行，将在本次任务结束后停止")
+            return
         logger.info("定时任务线程已停止")
 
     _scheduler_started = False

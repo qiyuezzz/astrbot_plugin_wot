@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import threading
 
 import aiohttp
@@ -9,23 +10,29 @@ from data.plugins.astrbot_plugin_wot.src.infrastructure.network.request_context 
 )
 
 _session_lock = threading.Lock()
-_shared_session: aiohttp.ClientSession | None = None
+_shared_sessions: dict[asyncio.AbstractEventLoop, aiohttp.ClientSession] = {}
+_session_warmups: dict[aiohttp.ClientSession, set[str]] = {}
 
 
 def get_shared_session() -> aiohttp.ClientSession:
-    """返回进程级共享的 aiohttp Session，复用连接池。"""
-    global _shared_session
+    """返回当前事件循环共享的 aiohttp Session，复用连接池。"""
+    loop = asyncio.get_running_loop()
     with _session_lock:
-        if _shared_session is None or _shared_session.closed:
-            _shared_session = aiohttp.ClientSession()
-        return _shared_session
+        session = _shared_sessions.get(loop)
+        if session is None or session.closed:
+            session = aiohttp.ClientSession()
+            _shared_sessions[loop] = session
+            _session_warmups[session] = set()
+        return session
 
 
 async def close_shared_session() -> None:
-    """关闭共享 Session，用于插件卸载时清理。"""
-    global _shared_session
+    """关闭当前事件循环共享的 Session。"""
+    loop = asyncio.get_running_loop()
     with _session_lock:
-        session, _shared_session = _shared_session, None
+        session = _shared_sessions.pop(loop, None)
+        if session is not None:
+            _session_warmups.pop(session, None)
     if session and not session.closed:
         await session.close()
 
@@ -57,7 +64,7 @@ class HttpResponse:
 
 
 class HttpClient:
-    """基于 aiohttp 的异步 HTTP 客户端（复用进程级 Session）"""
+    """基于 aiohttp 的异步 HTTP 客户端（按事件循环复用 Session）"""
 
     def __init__(self, timeout: float | None = None):
         self._session: aiohttp.ClientSession | None = None
@@ -70,27 +77,36 @@ class HttpClient:
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        # Session 是进程级共享的，由 close_shared_session() 统一关闭
+        # Session 由所属事件循环在退出时统一关闭
         return False
 
     async def _prepare_headers(self, config: BaseConfig) -> dict:
         headers = config.build_headers()
 
         if config.warmup_url:
-            if not getattr(config, "_warmed", False):
-                await self._session.get(
+            with _session_lock:
+                warmed = config.warmup_url in _session_warmups.get(
+                    self._session, set()
+                )
+            if not warmed:
+                async with self._session.get(
                     config.warmup_url,
                     timeout=self._timeout,
                     ssl=config.verify_ssl,
-                )
-                config._warmed = True
+                ) as response:
+                    await response.read()
+                with _session_lock:
+                    _session_warmups.setdefault(self._session, set()).add(
+                        config.warmup_url
+                    )
 
         if config.need_csrf:
-            await self._session.get(
+            async with self._session.get(
                 config.warmup_url,
                 timeout=self._timeout,
                 ssl=config.verify_ssl,
-            )
+            ) as response:
+                await response.read()
             csrf = self._session.cookie_jar.filter_cookies(config.warmup_url).get(
                 "csrftoken"
             )
