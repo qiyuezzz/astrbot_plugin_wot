@@ -14,6 +14,8 @@ from data.plugins.astrbot_plugin_wot.src.application.player_resolver import (
 )
 from data.plugins.astrbot_plugin_wot.src.application.query_service import (
     build_efficiency_response,
+    build_garage_response,
+    build_moe_response,
     build_report_response,
 )
 from data.plugins.astrbot_plugin_wot.src.domain.report import PlayerStats
@@ -307,6 +309,44 @@ async def test_build_report_response_uses_returned_image_url(
     assert isinstance(result[0], Comp.At)
     assert isinstance(result[1], Comp.Image)
     assert result[1].file == "https://example.com/report.jpg"
+
+
+@pytest.mark.asyncio
+async def test_build_garage_response_returns_image(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        "data.plugins.astrbot_plugin_wot.src.application.query_service.resolve_player_account",
+        AsyncMock(return_value=("Tester", "123", None)),
+    )
+    monkeypatch.setattr(
+        "data.plugins.astrbot_plugin_wot.src.application.query_service.build_garage_text",
+        AsyncMock(return_value="Tester 的车库"),
+    )
+    monkeypatch.setattr(
+        "data.plugins.astrbot_plugin_wot.src.application.query_service.generate_text_report",
+        AsyncMock(return_value="https://example.com/garage.jpg"),
+    )
+
+    result = await build_garage_response(CommandInput("10001", [], None))
+
+    assert isinstance(result[1], Comp.Image)
+    assert result[1].file == "https://example.com/garage.jpg"
+
+
+@pytest.mark.asyncio
+async def test_build_moe_response_returns_image(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        "data.plugins.astrbot_plugin_wot.src.application.query_service.build_moe_text",
+        AsyncMock(return_value="59式 环线标伤"),
+    )
+    monkeypatch.setattr(
+        "data.plugins.astrbot_plugin_wot.src.application.query_service.generate_text_report",
+        AsyncMock(return_value="https://example.com/moe.jpg"),
+    )
+
+    result = await build_moe_response(CommandInput("10001", [], "59式"))
+
+    assert isinstance(result[1], Comp.Image)
+    assert result[1].file == "https://example.com/moe.jpg"
 
 
 @pytest.mark.asyncio

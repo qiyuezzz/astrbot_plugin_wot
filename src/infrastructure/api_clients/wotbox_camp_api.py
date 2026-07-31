@@ -143,19 +143,31 @@ async def fetch_garage_all(
 
 
 async def fetch_moe_ranking(
-    tank_type: str, tier: str, percentile: int, page: int = 1, size: int = 100
+    tank_type: str,
+    tier: str,
+    percentile: int,
+    page: int = 1,
+    size: int = 100,
+    max_pages: int = 10,
 ) -> list[dict]:
-    """获取环线（标伤）排行榜，percentile: 65=一环, 85=二环, 95=三环。"""
-    data = await _request(
-        "/rank/more",
-        {
-            "rank_type": "mastery",
-            "type": tank_type,
-            "tier": str(tier),
-            "size": str(size),
-            "page": str(page),
-            "sort": "mastery",
-            "percentile": str(percentile),
-        },
-    )
-    return data.get("ranking") or []
+    """获取完整环线排行榜，percentile: 65=一环, 85=二环, 95=三环。"""
+    ranking: list[dict] = []
+    current_page = page
+    for _ in range(max_pages):
+        data = await _request(
+            "/rank/more",
+            {
+                "rank_type": "mastery",
+                "type": tank_type,
+                "tier": str(tier),
+                "size": str(size),
+                "page": str(current_page),
+                "sort": "mastery",
+                "percentile": str(percentile),
+            },
+        )
+        ranking.extend(data.get("ranking") or [])
+        if not data.get("next"):
+            break
+        current_page += 1
+    return ranking

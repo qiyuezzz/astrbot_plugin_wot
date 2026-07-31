@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{ title }}</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      width: {{ width }}px;
+      padding: 44px;
+      color: #18212f;
+      background: #eef2f7;
+      font-family: "Noto Sans SC", "Microsoft YaHei", "PingFang SC", sans-serif;
+    }
+    .report {
+      overflow: hidden;
+      border: 1px solid #dbe3ed;
+      border-radius: 24px;
+      background: #ffffff;
+      box-shadow: 0 16px 48px rgba(26, 42, 68, 0.12);
+    }
+    .header {
+      padding: 34px 42px;
+      color: #ffffff;
+      background: linear-gradient(135deg, #5268dc 0%, #704fca 100%);
+    }
+    .header h1 {
+      margin: 0;
+      font-size: 46px;
+      line-height: 1.25;
+      letter-spacing: 2px;
+    }
+    .header p {
+      margin: 10px 0 0;
+      font-size: 22px;
+      opacity: 0.82;
+    }
+    .content { padding: 30px; }
+    .summary {
+      margin: 0 0 20px;
+      color: #43516a;
+      font-size: 26px;
+      font-weight: 600;
+    }
+    .table-wrap {
+      overflow: hidden;
+      border: 1px solid #dce4ee;
+      border-radius: 16px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #ffffff;
+      font-size: 25px;
+      line-height: 1.35;
+    }
+    th {
+      padding: 20px 14px;
+      color: #34435a;
+      background: #edf2f8;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    td {
+      padding: 18px 14px;
+      border-top: 1px solid #e4eaf1;
+      text-align: center;
+      white-space: nowrap;
+    }
+    tbody tr:nth-child(even) { background: #f8fafc; }
+    td:nth-child(2) { text-align: left; font-weight: 650; }
+    .moe td:first-child { text-align: left; font-weight: 650; }
+    .moe td:nth-child(2) { text-align: center; font-weight: 500; }
+    .footer {
+      margin: 20px 4px 0;
+      color: #78869a;
+      font-size: 21px;
+      text-align: right;
+    }
+    .section {
+      margin-top: 22px;
+      padding: 26px 30px;
+      border: 1px solid #e0e7f0;
+      border-radius: 16px;
+      background: #f9fbfd;
+      font-size: 28px;
+      font-weight: 500;
+      line-height: 1.75;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+    .section:first-child { margin-top: 0; }
+  </style>
+</head>
+<body>
+  <main class="report">
+    <header class="header">
+      <h1>{{ title }}</h1>
+      <p>坦克世界数据查询</p>
+    </header>
+    <div class="content">
+      {% if table %}
+      <p class="summary">{{ table.summary }}</p>
+      <div class="table-wrap">
+        <table class="{{ layout }}">
+          <thead>
+            <tr>
+              {% for header in table.headers %}<th>{{ header }}</th>{% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in table.rows %}
+            <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% for notice in table.notices %}
+      <section class="section">{{ notice }}</section>
+      {% endfor %}
+      <p class="footer">{{ table.footer }}</p>
+      {% else %}
+      {% for section in sections %}
+      <section class="section">{{ section }}</section>
+      {% endfor %}
+      {% endif %}
+    </div>
+  </main>
+</body>
+</html>

@@ -63,3 +63,24 @@ async def test_fetch_moe_ranking_returns_ranking(monkeypatch):
     monkeypatch.setattr(wotbox_camp_api, "_request", _fake_request)
     ranking = await wotbox_camp_api.fetch_moe_ranking("mediumTank", "9", 95)
     assert ranking == []
+
+
+@pytest.mark.asyncio
+async def test_fetch_moe_ranking_fetches_all_pages(monkeypatch):
+    requested_pages: list[str] = []
+
+    async def _fake_request(_path, params):
+        requested_pages.append(params["page"])
+        if params["page"] == "1":
+            return {"ranking": [{"tank_id": 1}], "next": 1}
+        return {"ranking": [{"tank_id": 49, "mastery": 2460}], "next": 0}
+
+    monkeypatch.setattr(wotbox_camp_api, "_request", _fake_request)
+
+    ranking = await wotbox_camp_api.fetch_moe_ranking("mediumTank", "8", 95)
+
+    assert requested_pages == ["1", "2"]
+    assert ranking == [
+        {"tank_id": 1},
+        {"tank_id": 49, "mastery": 2460},
+    ]

@@ -19,6 +19,9 @@ from data.plugins.astrbot_plugin_wot.src.application.player_resolver import (
     resolve_player_account,
     resolve_player_name,
 )
+from data.plugins.astrbot_plugin_wot.src.application.report.text_report_renderer import (
+    generate_text_report,
+)
 
 MessageChain = list[Comp.BaseMessageComponent]
 
@@ -97,12 +100,17 @@ async def build_garage_response(input: CommandInput) -> MessageChain:
         return _error_chain(input.send_id, err)
     try:
         text = await build_garage_text(player_name, account_id)
+        image_url = await generate_text_report(
+            input.send_id, "车库查询", text, layout="garage"
+        )
+        if not image_url:
+            raise ValueError("生成车库图片失败")
     except Exception as exc:
         logger.exception(
             f"车库查询失败 (玩家={player_name}, 用户={input.send_id}): {exc}"
         )
         return _error_chain(input.send_id, "查询失败，请稍后再试")
-    return [Comp.At(qq=input.send_id), Comp.Plain(text)]
+    return [Comp.At(qq=input.send_id), Comp.Image.fromURL(image_url)]
 
 
 async def build_moe_response(input: CommandInput) -> MessageChain:
@@ -114,7 +122,12 @@ async def build_moe_response(input: CommandInput) -> MessageChain:
         ]
     try:
         text = await build_moe_text(input.explicit_name)
+        image_url = await generate_text_report(
+            input.send_id, "环线标伤", text, layout="moe"
+        )
+        if not image_url:
+            raise ValueError("生成环线图片失败")
     except Exception as exc:
         logger.exception(f"环线查询失败 (坦克={input.explicit_name}): {exc}")
         return _error_chain(input.send_id, "查询失败，请稍后再试")
-    return [Comp.At(qq=input.send_id), Comp.Plain(text)]
+    return [Comp.At(qq=input.send_id), Comp.Image.fromURL(image_url)]
