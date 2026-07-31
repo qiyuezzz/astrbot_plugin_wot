@@ -1,6 +1,4 @@
-import json
 from importlib import import_module
-from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -99,10 +97,51 @@ async def test_plugin_initialize_starts_scheduler_and_syncs_tanks(
         "data.plugins.astrbot_plugin_wot.main.sync_all_tank_info",
         _fake_sync_all_tank_info,
     )
+
+    class _MissingPath:
+        def exists(self):
+            return False
+
+    monkeypatch.setattr(
+        "data.plugins.astrbot_plugin_wot.main.prepare_tank_info_path",
+        lambda: _MissingPath(),
+    )
     plugin = MyPlugin(context=MagicMock())
     await plugin.initialize()
     assert called["started"] is True
     assert called["synced"] is True
+
+
+@pytest.mark.asyncio
+async def test_plugin_initialize_skips_sync_when_tank_data_exists(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    called = {"synced": False}
+
+    monkeypatch.setattr(
+        "data.plugins.astrbot_plugin_wot.main.start_timer_thread", lambda: None
+    )
+
+    async def _fake_sync_all_tank_info():
+        called["synced"] = True
+        return "ok"
+
+    monkeypatch.setattr(
+        "data.plugins.astrbot_plugin_wot.main.sync_all_tank_info",
+        _fake_sync_all_tank_info,
+    )
+
+    class _ExistingPath:
+        def exists(self):
+            return True
+
+    monkeypatch.setattr(
+        "data.plugins.astrbot_plugin_wot.main.prepare_tank_info_path",
+        lambda: _ExistingPath(),
+    )
+    plugin = MyPlugin(context=MagicMock())
+    await plugin.initialize()
+    assert called["synced"] is False
 
 
 @pytest.mark.asyncio
@@ -251,25 +290,16 @@ async def test_get_today_performance_returns_report_chain(
 
 
 @pytest.mark.asyncio
-async def test_build_report_response_prefers_newer_url_artifact(
+async def test_build_report_response_uses_returned_image_url(
     monkeypatch: pytest.MonkeyPatch,
-    tmp_path: Path,
 ):
     monkeypatch.setattr(
         "data.plugins.astrbot_plugin_wot.src.application.query_service.resolve_player_name",
         AsyncMock(return_value=("Tester", None)),
     )
-    monkeypatch.setattr(
-        "data.plugins.astrbot_plugin_wot.src.application.query_service.report_dir_path",
-        tmp_path,
-    )
 
-    async def _fake_report(_send_id: str, _name: str | None):
-        jpg_path = tmp_path / "10001.jpg"
-        jpg_path.write_bytes(b"old-jpg")
-        url_file_path = tmp_path / "10001.url"
-        with open(url_file_path, "w", encoding="utf-8") as f:
-            json.dump({"url": "https://example.com/report.jpg"}, f)
+    async def _fake_report(_send_id: str, _name: str | None) -> str:
+        return "https://example.com/report.jpg"
 
     input = CommandInput("10001", [], None)
     result = await build_report_response(input, _fake_report)

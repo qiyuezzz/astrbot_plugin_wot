@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star, register
@@ -19,7 +22,16 @@ from data.plugins.astrbot_plugin_wot.src.application.report.report_service impor
 from data.plugins.astrbot_plugin_wot.src.application.tank_sync_service import (
     sync_all_tank_info,
 )
-from data.plugins.astrbot_plugin_wot.src.tasks.scheduler import start_timer_thread
+from data.plugins.astrbot_plugin_wot.src.infrastructure.network.http_client import (
+    close_shared_session,
+)
+from data.plugins.astrbot_plugin_wot.src.settings.storage import (
+    prepare_tank_info_path,
+)
+from data.plugins.astrbot_plugin_wot.src.tasks.scheduler import (
+    start_timer_thread,
+    stop_timer_thread,
+)
 
 EFFICIENCY_COMMANDS = ["效率", "盒子效率"]
 
@@ -30,6 +42,20 @@ _REPORT_HANDLERS = [
     ("query_three_days_report", 3),
     ("query_hundred_report", 4),
 ]
+
+
+def _load_plugin_version() -> str:
+    """从 metadata.yaml 读取插件版本，避免与注册信息重复维护。"""
+    metadata_path = Path(__file__).resolve().parent / "metadata.yaml"
+    try:
+        match = re.search(
+            r"^version:\s*(\S+)", metadata_path.read_text(encoding="utf-8"), re.M
+        )
+        if match:
+            return match.group(1)
+    except OSError:
+        pass
+    return "v0.0.0"
 
 
 def _make_report_handler(config, plugin_instance):
@@ -46,7 +72,7 @@ def _make_report_handler(config, plugin_instance):
     return _handler
 
 
-@register("astrbot_plugin_wot", "zzc", "查询坦克世界效率和战绩", "v1.2.0")
+@register("astrbot_plugin_wot", "zzc", "查询坦克世界效率和战绩", _load_plugin_version())
 class MyPlugin(Star):
     def __init__(self, context: Context):
         super().__init__(context)
@@ -67,8 +93,11 @@ class MyPlugin(Star):
         logger.info(f"插件配置已加载: {config}")
 
     async def initialize(self):
-        """插件初始化：启动定时任务并同步坦克数据"""
+        """插件初始化：启动定时任务；首次使用（无坦克数据文件）时同步坦克数据"""
         start_timer_thread()
+        if prepare_tank_info_path().exists():
+            logger.info("坦克数据文件已存在，跳过启动同步，由每日定时任务更新")
+            return
         try:
             result = await sync_all_tank_info()
             logger.info(f"坦克数据初始化: {result}")
@@ -202,5 +231,6 @@ class MyPlugin(Star):
         yield event.plain_result(help_text)
 
     async def terminate(self):
-        """插件销毁时的清理逻辑"""
-        pass
+        """插件销毁时的清理逻辑：停止定时任务并关闭共享 HTTP Session"""
+        stop_timer_thread()
+        await close_shared_session()

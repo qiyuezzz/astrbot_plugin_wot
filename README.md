@@ -82,4 +82,24 @@ docker run -itd -p 8999:8999 soulter/astrbot-t2i-service:latest
 - `jinja2>=3.1.6`：HTML 报表模板渲染
 - `bs4>=0.0.2`：偶游盒子页面数据解析
 - `schedule>=1.2.2`：每日定时同步坦克数据
+- `aiohttp>=3.11.18`：异步 HTTP 客户端
 
+### 开发与测试
+
+安装开发依赖：
+
+```bash
+pip install -r requirements.txt -r requirements-dev.txt
+```
+
+运行测试（测试使用 `data.plugins.astrbot_plugin_wot.*` 导入路径，需在 AstrBot 项目根目录执行）：
+
+```bash
+python -m pytest data/plugins/astrbot_plugin_wot/tests -q
+```
+
+静态检查：
+
+```bash
+ruff check .
+```

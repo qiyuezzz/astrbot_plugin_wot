@@ -12,6 +12,9 @@ from data.plugins.astrbot_plugin_wot.src.infrastructure.api_clients.wotinspector
     fetch_tank_db_js,
     parse_tank_db,
 )
+from data.plugins.astrbot_plugin_wot.src.infrastructure.repositories.tank_repository import (
+    invalidate_tank_db_cache,
+)
 from data.plugins.astrbot_plugin_wot.src.settings.storage import prepare_tank_info_path
 
 
@@ -49,6 +52,7 @@ async def sync_all_tank_info():
     tank_info_file = prepare_tank_info_path()
     with tank_info_file.open("w", encoding="utf-8") as f:
         json.dump(name_indexed_library, f, ensure_ascii=False, indent=4)
+    invalidate_tank_db_cache()
 
     logger.info(
         f"成功！已保存 {len(name_indexed_library)} 辆坦克的全字段信息，"

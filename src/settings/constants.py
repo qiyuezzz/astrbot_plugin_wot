@@ -94,7 +94,7 @@ def get_cache_ttl_seconds() -> int:
     """获取缓存 TTL（优先从插件配置读取）"""
     return get_plugin_config().get(
         "cache_ttl_seconds",
-        _env_int("WOT_REPORT_CACHE_TTL_SECONDS", 45),
+        _env_int("WOT_REPORT_CACHE_TTL_SECONDS", 60),
     )
 
 
@@ -102,7 +102,7 @@ def get_cache_max_entries() -> int:
     """获取缓存最大条目数（优先从插件配置读取）"""
     return get_plugin_config().get(
         "cache_max_entries",
-        _env_int("WOT_REPORT_CACHE_MAX_ENTRIES", 128),
+        _env_int("WOT_REPORT_CACHE_MAX_ENTRIES", 100),
     )
 
 

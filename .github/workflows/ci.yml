@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: plugin
+
+      - uses: actions/checkout@v4
+        with:
+          repository: AstrBotDevs/AstrBot
+          path: AstrBot
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Lint with Ruff
+        working-directory: plugin
+        run: |
+          pip install ruff
+          ruff check .
+
+      - name: Install dependencies
+        run: |
+          pip install -r AstrBot/requirements.txt
+          pip install -r plugin/requirements-dev.txt
+
+      - name: Run tests
+        working-directory: AstrBot
+        run: |
+          cp -r ../plugin data/plugins/astrbot_plugin_wot
+          python -m pytest data/plugins/astrbot_plugin_wot/tests -q

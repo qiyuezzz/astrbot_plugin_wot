@@ -37,7 +37,10 @@ async def resolve_player_name(
             return target_name, None
         if explicit_name.startswith("@"):
             return None, "at_text_only"
-        if not await player_exists(explicit_name):
+        exists = await player_exists(explicit_name)
+        if exists is None:
+            return None, "network_error"
+        if not exists:
             return None, "player_not_found"
         return explicit_name, None
 
@@ -63,6 +66,8 @@ def error_message(err: str) -> str:
         return "对方未绑定游戏名称，请先绑定"
     if err == "self_unbound":
         return CheckBindMsg.failed()
+    if err == "network_error":
+        return "网络异常，无法校验玩家名称，请稍后再试"
     return "查询失败，请稍后再试"
 
 

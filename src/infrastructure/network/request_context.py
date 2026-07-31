@@ -16,7 +16,8 @@ class BaseConfig:
 
     def build_params(self) -> dict | None:
         """统一 Params 构造入口（可覆写）"""
-        return getattr(self, "params", None)
+        params = getattr(self, "params", None)
+        return dict(params) if params else None
 
 
 class WotBoxStatsConfig(BaseConfig):

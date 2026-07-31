@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import re
 from functools import lru_cache
 from pathlib import Path
@@ -40,12 +39,23 @@ async def generate_report(
         f.write(html_output)
     logger.info(f"HTML文件已保存：{html_file_path}")
 
+    table_rows = count_table_rows(html_output)
+    width, height = estimate_screenshot_size(
+        wot_render_context, table_rows=table_rows
+    )
+    retry_size = estimate_retry_screenshot_size(
+        wot_render_context, (width, height), table_rows=table_rows
+    )
+    if retry_size:
+        # 大表直接按重试尺寸预放大，避免首张图片截断后再重试
+        width, height = retry_size
+
     options = {
         "full_page": True,
         "type": "jpeg",
         "quality": 100,
-        "width": 2560,
-        "height": 2560,
+        "width": width,
+        "height": height,
         "device_scale_factor": 1,
     }
 
@@ -53,12 +63,6 @@ async def generate_report(
         html_output, {}, return_url=True, options=options
     )
     logger.info(f"T2I 生成的图片 URL: {image_url}")
-
-    url_file_path = report_dir / f"{send_id}.url"
-    with open(url_file_path, "w", encoding="utf-8") as f:
-        json.dump({"url": image_url}, f)
-    logger.info(f"T2I 图片 URL 已保存: {url_file_path}")
-
     return image_url
 
 

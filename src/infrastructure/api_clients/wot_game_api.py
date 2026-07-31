@@ -26,7 +26,7 @@ async def fetch_all_tank_info():
             logger.info("Fetching full tank data...")
             return await client.send_post(
                 config=wot_game_tank_info_config,
-                data=wot_game_tank_info_config.data,
+                data=dict(wot_game_tank_info_config.data),
             )
         except Exception as exc:
             logger.error(f"Failed to fetch full tank data: {exc}")

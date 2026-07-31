@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -32,6 +33,9 @@ from data.plugins.astrbot_plugin_wot.src.infrastructure.repositories.bindings_re
     read_binding_data,
 )
 
+# 限制同时进行重报表构建的并发数（每个报表会发起大量战斗详情请求）
+_REPORT_BUILD_SEMAPHORE = asyncio.Semaphore(3)
+
 
 @dataclass(frozen=True)
 class ReportConfig:
@@ -56,9 +60,9 @@ async def query_report(
     send_id: str,
     config: ReportConfig,
     player_name_override: str | None = None,
-) -> None:
+) -> str:
     """根据配置生成对应报表"""
-    await _generate_report_data(
+    return await _generate_report_data(
         send_id=send_id,
         title=config.title,
         get_arena_list_func=config.func,
@@ -73,7 +77,7 @@ async def _generate_report_data(
     get_arena_list_func: Callable,
     func_param: int,
     player_name_override: str | None = None,
-) -> None:
+) -> str:
     """解析目标玩家，构建渲染上下文并生成报表"""
     try:
         player_name = player_name_override or read_binding_data(send_id)
@@ -86,7 +90,7 @@ async def _generate_report_data(
             get_arena_list_func=get_arena_list_func,
             func_param=func_param,
         )
-        await generate_report(send_id, wot_render_context)
+        return await generate_report(send_id, wot_render_context)
     except Exception as exc:
         logger.error(f"获取{title}数据失败（用户{send_id}）：{exc}", exc_info=True)
         raise
@@ -109,30 +113,35 @@ async def build_wot_render_context(
         return cached
 
     async def _build_uncached() -> WotRenderContext:
-        wot_box_gateway = WotBoxService()
-        player_stats = await wot_box_gateway.get_player_stats(player_name)
-        if not player_stats or len(player_stats) < 2:
-            raise ValueError(f"获取玩家{player_name}基础统计信息失败，返回数据异常")
+        async with _REPORT_BUILD_SEMAPHORE:
+            wot_box_gateway = WotBoxService()
+            player_stats = await wot_box_gateway.get_player_stats(player_name)
+            if not player_stats or len(player_stats) < 2:
+                raise ValueError(f"获取玩家{player_name}基础统计信息失败，返回数据异常")
 
-        arena_list = await get_arena_list_func(player_name, func_param)
-        if arena_list:
-            detail_arena_list = await get_detail_record_list(player_name, arena_list)
-            if detail_arena_list:
-                final_summary = get_final_summary(detail_arena_list, title)
+            arena_list = await get_arena_list_func(player_name, func_param)
+            if arena_list:
+                detail_arena_list = await get_detail_record_list(
+                    player_name, arena_list
+                )
+                if detail_arena_list:
+                    final_summary = get_final_summary(detail_arena_list, title)
+                else:
+                    logger.warning(
+                        f"玩家{player_name}未查询到{title}对应的详细对局数据"
+                    )
+                    final_summary = FinalSummary(summary_title=title)
             else:
-                logger.warning(f"玩家{player_name}未查询到{title}对应的详细对局数据")
+                logger.warning(f"玩家{player_name}未查询到{title}对应的对局数据")
                 final_summary = FinalSummary(summary_title=title)
-        else:
-            logger.warning(f"玩家{player_name}未查询到{title}对应的对局数据")
-            final_summary = FinalSummary(summary_title=title)
 
-        wot_render_context = WotRenderContext(
-            player_stats=player_stats[0],
-            frequent_tank=player_stats[1],
-            final_summary=final_summary,
-        )
-        logger.info(f"成功生成{title}渲染上下文：{wot_render_context}")
-        set_cached_report_context(cache_key, wot_render_context)
-        return wot_render_context
+            wot_render_context = WotRenderContext(
+                player_stats=player_stats[0],
+                frequent_tank=player_stats[1],
+                final_summary=final_summary,
+            )
+            logger.info(f"成功生成{title}渲染上下文：{wot_render_context}")
+            set_cached_report_context(cache_key, wot_render_context)
+            return wot_render_context
 
     return await run_with_inflight_dedupe(cache_key, _build_uncached)

@@ -1,6 +1,5 @@
 import asyncio
 import threading
-import time
 
 import schedule
 
@@ -11,6 +10,7 @@ from data.plugins.astrbot_plugin_wot.src.application.tank_sync_service import (
 
 _scheduler_started = False
 _scheduler_thread: threading.Thread | None = None
+_scheduler_stop = threading.Event()
 
 
 def run_scheduler():
@@ -34,9 +34,10 @@ def run_scheduler():
     schedule.every().day.at("10:00").do(daily_task)
     logger.info("定时任务调度器已启动，下次执行时间: 明天 10:00")
 
-    while True:
+    while not _scheduler_stop.is_set():
         schedule.run_pending()
-        time.sleep(60)  # 改为 60 秒检查一次，降低 CPU 占用
+        if _scheduler_stop.wait(60):  # 60 秒检查一次，降低 CPU 占用
+            break
 
 
 def start_timer_thread():
@@ -47,6 +48,7 @@ def start_timer_thread():
         logger.debug("定时任务线程已存在，跳过启动")
         return
 
+    _scheduler_stop.clear()
     _scheduler_thread = threading.Thread(
         target=run_scheduler, daemon=True, name="WotScheduler"
     )
@@ -60,8 +62,9 @@ def stop_timer_thread():
     global _scheduler_started, _scheduler_thread
 
     if _scheduler_thread and _scheduler_thread.is_alive():
-        # 由于是 daemon 线程，会在主程序退出时自动停止
-        logger.info("定时任务线程将在主程序退出时自动停止")
+        _scheduler_stop.set()
+        _scheduler_thread.join(timeout=5)
+        logger.info("定时任务线程已停止")
 
     _scheduler_started = False
     _scheduler_thread = None

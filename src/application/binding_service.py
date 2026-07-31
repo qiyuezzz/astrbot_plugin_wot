@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import threading
+import time
+
 from astrbot.api import logger
 from data.plugins.astrbot_plugin_wot.src.domain.player import AccountInfo
 from data.plugins.astrbot_plugin_wot.src.infrastructure.api_clients.wot_game_api import (
@@ -8,6 +11,11 @@ from data.plugins.astrbot_plugin_wot.src.infrastructure.api_clients.wot_game_api
 from data.plugins.astrbot_plugin_wot.src.infrastructure.repositories.bindings_repository import (
     write_binding_data,
 )
+
+_EXISTS_CACHE_TTL_SECONDS = 24 * 60 * 60
+_EXISTS_CACHE_MAX_ENTRIES = 2048
+_player_exists_cache: dict[str, tuple[float, bool]] = {}
+_player_exists_lock = threading.Lock()
 
 
 async def bind_user_name(send_id: str, player_name: str) -> AccountInfo | None:
@@ -38,14 +46,31 @@ async def bind_user_name(send_id: str, player_name: str) -> AccountInfo | None:
         return None
 
 
-async def player_exists(player_name: str) -> bool:
-    """检查玩家名称是否存在于游戏中"""
+async def player_exists(player_name: str) -> bool | None:
+    """检查玩家名称是否存在于游戏中
+
+    返回 True/False 表示校验结果；返回 None 表示网络异常、结果未知。
+    校验结果缓存 24 小时，避免每次查询都额外发起一次官网搜索请求。
+    """
     if len(player_name) > 14 or len(player_name) < 4:
         return False
+
+    now = time.time()
+    with _player_exists_lock:
+        cached = _player_exists_cache.get(player_name)
+        if cached and now - cached[0] < _EXISTS_CACHE_TTL_SECONDS:
+            return cached[1]
+
     try:
         resp = await fetch_account_search(player_name)
         resp_dict = await resp.json()
-        return bool(resp_dict.get("response"))
+        exists = bool(resp_dict.get("response"))
     except Exception as exc:
         logger.info(f"玩家存在性校验失败: {exc}")
-        return False
+        return None
+
+    with _player_exists_lock:
+        if len(_player_exists_cache) >= _EXISTS_CACHE_MAX_ENTRIES:
+            _player_exists_cache.clear()
+        _player_exists_cache[player_name] = (time.time(), exists)
+    return exists

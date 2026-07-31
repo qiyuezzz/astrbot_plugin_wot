@@ -6,6 +6,10 @@ from typing import Any
 
 import aiohttp
 
+from data.plugins.astrbot_plugin_wot.src.infrastructure.network.http_client import (
+    get_shared_session,
+)
+
 TANK_DB_PC_URL = "https://armor.wotinspector.com/static/armorinspector/tank_db_pc.js"
 
 TYPE_TAGS = ("lightTank", "mediumTank", "heavyTank", "AT-SPG", "SPG")
@@ -19,12 +23,11 @@ TYPE_BY_ID = {
 
 
 async def fetch_tank_db_js(url: str = TANK_DB_PC_URL, timeout: int = 30) -> str:
-    async with aiohttp.ClientSession() as session:
-        async with session.get(
-            url, timeout=aiohttp.ClientTimeout(total=timeout)
-        ) as resp:
-            resp.raise_for_status()
-            return await resp.text()
+    async with get_shared_session().get(
+        url, timeout=aiohttp.ClientTimeout(total=timeout)
+    ) as resp:
+        resp.raise_for_status()
+        return await resp.text()
 
 
 def parse_tank_db(js_text: str) -> dict[str, dict[str, Any]]:
