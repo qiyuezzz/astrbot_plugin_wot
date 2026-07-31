@@ -137,7 +137,54 @@ def find_tanks_by_name(tank_name: str) -> list[Tank]:
     return [get_tank_info_by_name(candidate) for candidate in contains_matches]
 
 
+def find_tank_candidates_by_name(tank_name: str) -> list[Tank]:
+    """返回精确名称和部分匹配的全部候选，精确匹配排在最前。"""
+    if not tank_name:
+        return []
+    tank_db = _load_tank_db()
+    normalized = _normalize_tank_name(tank_name)
+    if not normalized:
+        return []
+
+    exact_matches: list[str] = []
+    partial_matches: list[str] = []
+    for candidate, payload in tank_db.items():
+        payload_name = payload.get("name", "") if isinstance(payload, dict) else ""
+        canonical_names = {
+            name
+            for name in (
+                _normalize_tank_name(candidate),
+                _normalize_tank_name(payload_name),
+            )
+            if name
+        }
+        aliases = _tank_name_aliases(candidate) | _tank_name_aliases(payload_name)
+        if normalized in canonical_names:
+            exact_matches.append(candidate)
+        elif any(normalized in name for name in aliases):
+            partial_matches.append(candidate)
+
+    return [
+        get_tank_info_by_name(candidate)
+        for candidate in (*exact_matches, *partial_matches)
+    ]
+
+
 def find_tank_by_name(tank_name: str) -> Tank | None:
     """兼容单结果调用；多候选时返回 None。"""
     matches = find_tanks_by_name(tank_name)
     return matches[0] if len(matches) == 1 else None
+
+
+def get_tank_full_info(tank: Tank) -> dict[str, Any]:
+    """按车辆 ID 读取同步后的完整字段，避免名称引号/别名导致查找失败。"""
+    for payload in _load_tank_db().values():
+        if not isinstance(payload, dict):
+            continue
+        try:
+            vehicle_cd = int(payload.get("vehicle_cd") or 0)
+        except (TypeError, ValueError):
+            continue
+        if tank.vehicle_cd and vehicle_cd == tank.vehicle_cd:
+            return dict(payload)
+    return {}

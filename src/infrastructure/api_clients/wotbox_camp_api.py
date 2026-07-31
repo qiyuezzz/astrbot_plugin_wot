@@ -171,3 +171,18 @@ async def fetch_moe_ranking(
             break
         current_page += 1
     return ranking
+
+
+async def fetch_tank_wiki_summary(tank_id: int | str) -> dict:
+    """获取坦克百科摘要（名称、等级、类型和车辆图片）。"""
+    data = await _request(
+        "/wiki/app_vehicles",
+        {"page_no": "1", "length": "10", "tankId": str(tank_id)},
+    )
+    vehicles = data.get("data") or []
+    return vehicles[0] if vehicles else {}
+
+
+async def fetch_tank_wiki_profile(tank_id: int | str) -> dict:
+    """获取坦克营地完整百科参数。"""
+    return await _request("/wiki/app_vehiclesprofile", {"tankId": str(tank_id)})

@@ -19,7 +19,7 @@ _IMAGE_MAX_HEIGHT = 8000
 _IMAGE_BASE_HEIGHT = 280
 _IMAGE_PER_LINE_HEIGHT = 76
 
-ReportLayout = Literal["text", "garage", "moe"]
+ReportLayout = Literal["text", "garage", "moe", "tank_detail", "tank_compare"]
 
 _GARAGE_ROW_PATTERN = re.compile(
     r"^(?P<rank>\d+)\.\s+(?P<tank>.+?)\s+(?P<tier>\S+)\s+(?P<type>\S+)\s+"
@@ -39,9 +39,10 @@ async def generate_text_report(
     title: str,
     text: str,
     layout: ReportLayout = "text",
+    hero_images: tuple[tuple[str, str], ...] = (),
 ) -> str:
     """将文本查询结果渲染为图片并返回远程 URL。"""
-    html_output = render_text_report_html(title, text, layout)
+    html_output = render_text_report_html(title, text, layout, hero_images)
     report_dir = Path(report_dir_path).resolve()
     report_dir.mkdir(parents=True, exist_ok=True)
     safe_send_id = re.sub(r"[^0-9A-Za-z_-]", "_", send_id)
@@ -49,7 +50,7 @@ async def generate_text_report(
     html_file_path.write_text(html_output, encoding="utf-8")
 
     line_count = max(1, len(text.splitlines()))
-    image_width = 1800 if layout == "garage" else 1200
+    image_width = 2200 if layout.startswith("tank_") else 1800 if layout == "garage" else 1200
     height = max(
         _IMAGE_MIN_HEIGHT,
         min(_IMAGE_MAX_HEIGHT, _IMAGE_BASE_HEIGHT + line_count * _IMAGE_PER_LINE_HEIGHT),
@@ -87,15 +88,24 @@ def render_text_report_html(
     title: str,
     text: str,
     layout: ReportLayout = "text",
+    hero_images: tuple[tuple[str, str], ...] = (),
 ) -> str:
     sections = [section.strip() for section in text.split("\n\n") if section.strip()]
     table = _build_table(layout, sections)
+    cards, card_footer = _build_cards(layout, sections)
+    card_columns = _distribute_card_columns(
+        cards[1:] if cards else [], 4 if layout == "tank_detail" else 3
+    )
     return get_text_report_template().render(
         title=title,
         layout=layout,
-        width=1800 if layout == "garage" else 1200,
+        width=2200 if layout.startswith("tank_") else 1800 if layout == "garage" else 1200,
         sections=sections,
         table=table,
+        cards=cards,
+        card_columns=card_columns,
+        card_footer=card_footer,
+        hero_images=hero_images,
     )
 
 
@@ -105,6 +115,75 @@ def _build_table(layout: ReportLayout, sections: list[str]) -> dict | None:
     if layout == "moe":
         return _build_moe_table(sections)
     return None
+
+
+def _build_cards(
+    layout: ReportLayout, sections: list[str]
+) -> tuple[list[dict[str, object]] | None, str]:
+    if layout not in ("tank_detail", "tank_compare"):
+        return None, ""
+    cards: list[dict[str, object]] = []
+    footer = ""
+    for section in sections:
+        if section.startswith("数据来源："):
+            footer = section
+            continue
+        lines = section.splitlines()
+        title = lines[0].strip().strip("【】")
+        rows: list[dict[str, str]] = []
+        for line in lines[1:]:
+            stripped = line.strip()
+            if "：" in stripped:
+                label, value = stripped.split("：", 1)
+                kind = "sub" if line.startswith("  ") else "normal"
+                if label == "项目":
+                    kind = "comparison-head"
+                rows.append(
+                    {"label": label.strip(), "value": value.strip(), "kind": kind}
+                )
+            elif stripped:
+                rows.append({"label": "", "value": stripped, "kind": "full"})
+        cards.append({"title": title, "rows": rows})
+    if cards:
+        intro_rows = cards[0]["rows"]
+        if isinstance(intro_rows, list):
+            split_rows: list[dict[str, str]] = []
+            for row in intro_rows:
+                value = str(row.get("value") or "")
+                if not row.get("label") and " · " in value:
+                    split_rows.extend(
+                        {
+                            "label": "",
+                            "value": item.strip(),
+                            "kind": "intro-meta",
+                        }
+                        for item in value.split(" · ")
+                        if item.strip()
+                    )
+                else:
+                    split_rows.append(row)
+            cards[0]["rows"] = split_rows
+    return cards, footer
+
+
+def _distribute_card_columns(
+    cards: list[dict[str, object]], column_count: int
+) -> list[list[dict[str, object]]]:
+    """按卡片行数贪心分栏，避免 CSS 网格短卡片下方出现大块留白。"""
+    if not cards:
+        return []
+    columns: list[list[dict[str, object]]] = [[] for _ in range(column_count)]
+    weights = [0] * column_count
+    ordered_cards = sorted(
+        cards,
+        key=lambda card: len(card.get("rows") or []) + 2,
+        reverse=True,
+    )
+    for card in ordered_cards:
+        target = min(range(column_count), key=weights.__getitem__)
+        columns[target].append(card)
+        weights[target] += len(card.get("rows") or []) + 2
+    return [column for column in columns if column]
 
 
 def _build_garage_table(sections: list[str]) -> dict | None:

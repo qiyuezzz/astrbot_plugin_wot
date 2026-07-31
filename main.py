@@ -6,15 +6,21 @@ from pathlib import Path
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star, register
+from astrbot.core.utils.session_waiter import SessionController, SessionFilter, session_waiter
 from data.plugins.astrbot_plugin_wot.src.application.message_parser import (
     CommandInput,
     extract_text_after_leading_at,
 )
 from data.plugins.astrbot_plugin_wot.src.application.query_service import (
-    build_garage_response,
     build_efficiency_response,
+    build_garage_response,
     build_moe_response,
     build_report_response,
+    build_single_vehicle_response,
+    build_tank_comparison_response,
+    build_tank_info_response,
+    find_tank_info_candidates,
+    format_tank_info_candidates,
     handle_bind_command,
 )
 from data.plugins.astrbot_plugin_wot.src.application.report.report_service import (
@@ -44,6 +50,13 @@ _REPORT_HANDLERS = [
     ("query_three_days_report", 3),
     ("query_hundred_report", 4),
 ]
+
+
+class _TankSelectionSessionFilter(SessionFilter):
+    """按消息来源和发送人隔离坦克候选选择会话。"""
+
+    def filter(self, event: AstrMessageEvent) -> str:
+        return f"{event.unified_msg_origin}:{event.get_sender_id()}"
 
 
 def _load_plugin_version() -> str:
@@ -121,6 +134,9 @@ class MyPlugin(Star):
             ([*EFFICIENCY_COMMANDS], self.query_basic_efficiency),
             (["wot绑定"], self.wot_bind_player_name),
             (["车库"], self.query_garage),
+            (["单车"], self.query_single_vehicle),
+            (["坦克"], self.query_tank_info),
+            (["对比"], self.query_tank_comparison),
             (["环线", "标伤"], self.query_moe),
             (["同步坦克", "更新坦克"], self.sync_full_tank_info),
             (["帮助"], self.show_help),
@@ -219,6 +235,94 @@ class MyPlugin(Star):
         chain = await build_garage_response(input)
         yield event.chain_result(chain)
 
+    @filter.command("单车")
+    async def query_single_vehicle(
+        self, event: AstrMessageEvent, message_text: str | None = None
+    ):
+        """查询玩家指定坦克的详细战绩"""
+        input = CommandInput.from_event(event, ["单车"], message_text)
+        chain = await build_single_vehicle_response(input)
+        yield event.chain_result(chain)
+
+    @filter.command("坦克")
+    async def query_tank_info(
+        self, event: AstrMessageEvent, message_text: str | None = None
+    ):
+        """查询坦克百科属性"""
+        input = CommandInput.from_event(event, ["坦克"], message_text)
+        if input.explicit_name:
+            candidates = find_tank_info_candidates(input.explicit_name)
+            if len(candidates) > 1:
+                yield event.plain_result(
+                    format_tank_info_candidates(input.explicit_name, candidates)
+                )
+
+                @session_waiter(timeout=60)
+                async def _tank_selection_waiter(
+                    controller: SessionController,
+                    waiting_event: AstrMessageEvent,
+                ) -> None:
+                    try:
+                        choice = waiting_event.message_str.strip().lstrip("/").strip()
+                        if choice in {"取消", "退出"}:
+                            await waiting_event.send(
+                                waiting_event.plain_result("已取消坦克查询。")
+                            )
+                            controller.stop()
+                            return
+                        if not choice.isdigit():
+                            await waiting_event.send(
+                                waiting_event.plain_result("请输入列表中的编号，或回复“取消”退出。")
+                            )
+                            controller.keep(timeout=60, reset_timeout=True)
+                            return
+                        index = int(choice) - 1
+                        if not 0 <= index < len(candidates):
+                            await waiting_event.send(
+                                waiting_event.plain_result(
+                                    f"编号无效，请输入 1-{len(candidates)}，或回复“取消”退出。"
+                                )
+                            )
+                            controller.keep(timeout=60, reset_timeout=True)
+                            return
+
+                        selected_input = CommandInput(
+                            input.send_id,
+                            waiting_event.get_messages(),
+                            candidates[index].name,
+                            input.self_id,
+                        )
+                        chain = await build_tank_info_response(selected_input)
+                        await waiting_event.send(waiting_event.chain_result(chain))
+                        controller.stop()
+                    finally:
+                        waiting_event.stop_event()
+
+                try:
+                    await _tank_selection_waiter(
+                        event,
+                        session_filter=_TankSelectionSessionFilter(),
+                    )
+                except TimeoutError:
+                    yield event.plain_result("选择已超时，请重新输入坦克名称查询。")
+                except Exception as exc:
+                    logger.exception(f"坦克候选选择失败 (坦克={input.explicit_name}): {exc}")
+                    yield event.plain_result("坦克查询失败，请重新输入坦克名称。")
+                finally:
+                    event.stop_event()
+                return
+        chain = await build_tank_info_response(input)
+        yield event.chain_result(chain)
+
+    @filter.command("对比")
+    async def query_tank_comparison(
+        self, event: AstrMessageEvent, message_text: str | None = None
+    ):
+        """对比两辆坦克的主要属性"""
+        input = CommandInput.from_event(event, ["对比"], message_text)
+        chain = await build_tank_comparison_response(input)
+        yield event.chain_result(chain)
+
     @filter.command("环线", alias={"标伤"})
     async def query_moe(self, event: AstrMessageEvent, message_text: str | None = None):
         """查询坦克一环/二环/三环标伤"""
@@ -241,7 +345,12 @@ class MyPlugin(Star):
         help_text += "- 两日效率/两日战绩 [玩家名称]：查询两日效率和战绩\n"
         help_text += "- 三日效率/三日战绩 [玩家名称]：查询三日效率和战绩\n"
         help_text += "- 百场效率/百场战绩 [玩家名称]：查询百场效率和战绩\n\n"
-        help_text += "- 车库 [玩家名称]：查询玩家车库的坦克战绩（WN8、胜率等）\n"
+        help_text += "- 车库 [玩家名称] [等级] [类型]：查询并筛选玩家车库\n"
+        help_text += "  示例：车库 10级 重坦、车库 玩家名 8级 中坦\n"
+        help_text += "- 单车 [玩家名称] [坦克名称]：查询指定坦克的详细战绩\n"
+        help_text += "- 坦克 [坦克名称]：查询坦克百科属性\n"
+        help_text += "  名称匹配到多辆坦克时会返回编号列表，回复编号选择（60秒内有效）\n"
+        help_text += "- 对比 [坦克A] 和 [坦克B]：对比两辆坦克的属性\n"
         help_text += "- 环线 [坦克名称]：查询坦克一环/二环/三环标伤阈值\n\n"
         help_text += "管理命令：\n"
         help_text += "- 同步坦克/更新坦克：融合官网与 WotInspector 的坦克信息\n\n"

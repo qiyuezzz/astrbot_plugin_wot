@@ -46,3 +46,25 @@ def test_render_multiple_moe_results_as_table():
     assert "<td>59式</td>" in html
     assert "<td>黄金59式</td>" in html
     assert "<td>2951</td>" in html
+
+
+def test_render_tank_detail_as_cards_with_vehicle_image():
+    html = render_text_report_html(
+        "坦克百科",
+        "59式 坦克百科\n8级 · 中国 · 中坦\n\n"
+        "【火力与炮控】\n移动扩圈：0.14\n射击俯角：-7°\n\n"
+        "数据来源：坦克营地（基础配置）",
+        layout="tank_detail",
+        hero_images=(("59式", "https://example.com/type59.png"),),
+    )
+
+    assert '<div class="hero-gallery">' in html
+    assert 'src="https://example.com/type59.png"' in html
+    assert '<h2>59式 坦克百科</h2>' not in html
+    assert 'class="data-row intro-meta"' in html
+    assert '<span class="data-value">8级</span>' in html
+    assert '<span class="data-value">中国</span>' in html
+    assert "<h2>火力与炮控</h2>" in html
+    assert '<span class="data-label">射击俯角</span>' in html
+    assert '<span class="data-value">-7°</span>' in html
+    assert "数据来源：坦克营地（基础配置）" in html

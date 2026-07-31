@@ -6,6 +6,7 @@ from data.plugins.astrbot_plugin_wot.src.infrastructure.repositories import (
 )
 from data.plugins.astrbot_plugin_wot.src.infrastructure.repositories.tank_repository import (
     find_tank_by_name,
+    find_tank_candidates_by_name,
     find_tanks_by_name,
     get_tank_info_by_name,
     invalidate_tank_db_cache,
@@ -148,3 +149,27 @@ def test_find_tanks_by_name_returns_all_ambiguous_partial_matches(
 
     assert [tank.name for tank in tanks] == ["野牛 C45", "野牛 C46"]
     assert find_tank_by_name("野牛") is None
+
+
+def test_find_tank_candidates_includes_exact_and_partial_matches(
+    tmp_path, monkeypatch
+):
+    data_file = tmp_path / "wot_tanks_full.json"
+    data_file.write_text(
+        json.dumps(
+            {
+                "野牛": _tank_payload("野牛", 3),
+                "野牛 C45": _tank_payload("野牛 C45", 4),
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        tank_repository, "prepare_tank_info_path", lambda: data_file
+    )
+    invalidate_tank_db_cache()
+
+    candidates = find_tank_candidates_by_name("野牛")
+
+    assert [tank.name for tank in candidates] == ["野牛", "野牛 C45"]

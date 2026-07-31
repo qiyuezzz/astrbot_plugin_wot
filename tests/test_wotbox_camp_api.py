@@ -84,3 +84,27 @@ async def test_fetch_moe_ranking_fetches_all_pages(monkeypatch):
         {"tank_id": 1},
         {"tank_id": 49, "mastery": 2460},
     ]
+
+
+@pytest.mark.asyncio
+async def test_fetch_tank_wiki_summary_returns_first_vehicle(monkeypatch):
+    async def _fake_request(path, params):
+        assert path == "/wiki/app_vehicles"
+        assert params["tankId"] == "49"
+        return {"data": [{"tank_id": 49, "tanke_image": "tank.png"}]}
+
+    monkeypatch.setattr(wotbox_camp_api, "_request", _fake_request)
+    summary = await wotbox_camp_api.fetch_tank_wiki_summary(49)
+    assert summary == {"tank_id": 49, "tanke_image": "tank.png"}
+
+
+@pytest.mark.asyncio
+async def test_fetch_tank_wiki_profile_uses_profile_endpoint(monkeypatch):
+    async def _fake_request(path, params):
+        assert path == "/wiki/app_vehiclesprofile"
+        assert params == {"tankId": "49"}
+        return {"tank_id": 49, "tank_info_list": []}
+
+    monkeypatch.setattr(wotbox_camp_api, "_request", _fake_request)
+    profile = await wotbox_camp_api.fetch_tank_wiki_profile("49")
+    assert profile["tank_id"] == 49

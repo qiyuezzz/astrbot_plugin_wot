@@ -1,9 +1,11 @@
 from importlib import import_module
+from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 import astrbot.api.message_components as Comp
+from data.plugins.astrbot_plugin_wot import main as plugin_main
 from data.plugins.astrbot_plugin_wot.main import MyPlugin
 from data.plugins.astrbot_plugin_wot.src.application.efficiency_service import (
     get_basic_efficiency_text,
@@ -17,8 +19,12 @@ from data.plugins.astrbot_plugin_wot.src.application.query_service import (
     build_garage_response,
     build_moe_response,
     build_report_response,
+    build_single_vehicle_response,
+    build_tank_comparison_response,
+    build_tank_info_response,
 )
 from data.plugins.astrbot_plugin_wot.src.domain.report import PlayerStats
+from data.plugins.astrbot_plugin_wot.src.application.tank_info_service import TankReport
 
 
 class DummyEvent:
@@ -33,6 +39,9 @@ class DummyEvent:
         self.message_str = message_str
         self._messages = messages
         self.is_at_or_wake_command = is_at_or_wake_command
+        self.unified_msg_origin = f"test:{sender_id}"
+        self.sent = []
+        self.stopped = False
 
     def get_sender_id(self):
         return self._sender_id
@@ -48,6 +57,12 @@ class DummyEvent:
 
     def plain_result(self, text: str):
         return {"plain": text}
+
+    async def send(self, payload):
+        self.sent.append(payload)
+
+    def stop_event(self):
+        self.stopped = True
 
 
 def _sample_player_stats(comment: str = "stable output") -> PlayerStats:
@@ -333,6 +348,106 @@ async def test_build_garage_response_returns_image(monkeypatch: pytest.MonkeyPat
 
 
 @pytest.mark.asyncio
+async def test_build_garage_response_separates_player_and_filters(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    resolver = AsyncMock(return_value=("Tester", "123", None))
+    builder = AsyncMock(return_value="筛选后的车库")
+    monkeypatch.setattr(
+        "data.plugins.astrbot_plugin_wot.src.application.query_service.resolve_player_account",
+        resolver,
+    )
+    monkeypatch.setattr(
+        "data.plugins.astrbot_plugin_wot.src.application.query_service.build_garage_text",
+        builder,
+    )
+    monkeypatch.setattr(
+        "data.plugins.astrbot_plugin_wot.src.application.query_service.generate_text_report",
+        AsyncMock(return_value="https://example.com/garage.jpg"),
+    )
+
+    await build_garage_response(CommandInput("10001", [], "Tester 10级 重坦"))
+
+    assert resolver.await_args.args[2] == "Tester"
+    builder.assert_awaited_once_with("Tester", "123", 10, "重坦")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("builder_name", "response_fn", "argument", "title"),
+    [
+        (
+            "build_tank_info_report",
+            build_tank_info_response,
+            "59式",
+            "坦克信息查询",
+        ),
+        (
+            "build_tank_comparison_report",
+            build_tank_comparison_response,
+            "59式 和 查狄伦 25t",
+            "坦克对比",
+        ),
+    ],
+)
+async def test_tank_reference_responses_render_images(
+    monkeypatch: pytest.MonkeyPatch,
+    builder_name,
+    response_fn,
+    argument,
+    title,
+):
+    monkeypatch.setattr(
+        f"data.plugins.astrbot_plugin_wot.src.application.query_service.{builder_name}",
+        AsyncMock(
+            return_value=TankReport(
+                "坦克资料", (("59式", "https://example.com/tank.png"),)
+            )
+        ),
+    )
+    renderer = AsyncMock(return_value="https://example.com/tank.jpg")
+    monkeypatch.setattr(
+        "data.plugins.astrbot_plugin_wot.src.application.query_service.generate_text_report",
+        renderer,
+    )
+
+    result = await response_fn(CommandInput("10001", [], argument))
+
+    assert isinstance(result[1], Comp.Image)
+    assert renderer.await_args.args[1] == title
+    assert renderer.await_args.kwargs["hero_images"][0][0] == "59式"
+
+
+@pytest.mark.asyncio
+async def test_build_single_vehicle_response_returns_image(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(
+        "data.plugins.astrbot_plugin_wot.src.application.query_service.parse_single_vehicle_query",
+        MagicMock(
+            return_value=MagicMock(player_name=None, tank_name="59式")
+        ),
+    )
+    monkeypatch.setattr(
+        "data.plugins.astrbot_plugin_wot.src.application.query_service.resolve_player_account",
+        AsyncMock(return_value=("Tester", "123", None)),
+    )
+    monkeypatch.setattr(
+        "data.plugins.astrbot_plugin_wot.src.application.query_service.build_single_vehicle_text",
+        AsyncMock(return_value="单车详情"),
+    )
+    monkeypatch.setattr(
+        "data.plugins.astrbot_plugin_wot.src.application.query_service.generate_text_report",
+        AsyncMock(return_value="https://example.com/single.jpg"),
+    )
+
+    result = await build_single_vehicle_response(CommandInput("10001", [], "59式"))
+
+    assert isinstance(result[1], Comp.Image)
+    assert result[1].file == "https://example.com/single.jpg"
+
+
+@pytest.mark.asyncio
 async def test_build_moe_response_returns_image(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(
         "data.plugins.astrbot_plugin_wot.src.application.query_service.build_moe_text",
@@ -423,3 +538,60 @@ async def test_query_moe_command_returns_chain(monkeypatch: pytest.MonkeyPatch):
     results = [item async for item in plugin.query_moe(event)]
     assert len(results) == 1
     assert results[0][1].text == "环线文本"
+
+
+@pytest.mark.asyncio
+async def test_query_tank_info_uses_session_for_ambiguous_name(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    candidates = [
+        SimpleNamespace(name="野牛"),
+        SimpleNamespace(name="野牛 C45"),
+    ]
+    for candidate in candidates:
+        candidate.tier = 8
+        candidate.nation = SimpleNamespace(display_name="德国")
+        candidate.type = SimpleNamespace(display_name="重坦")
+        candidate.role = SimpleNamespace(display_name="通用/无定位")
+
+    selection_event = DummyEvent(
+        sender_id="10001",
+        message_str="2",
+        messages=[Comp.Plain("2")],
+    )
+    controller = MagicMock()
+
+    def fake_session_waiter(*, timeout):
+        assert timeout == 60
+
+        def decorator(handler):
+            async def wrapper(event, session_filter=None):
+                await handler(controller, selection_event)
+
+            return wrapper
+
+        return decorator
+
+    monkeypatch.setattr(plugin_main, "find_tank_info_candidates", lambda _name: candidates)
+    monkeypatch.setattr(
+        plugin_main,
+        "format_tank_info_candidates",
+        lambda _name, _candidates: "候选列表",
+    )
+    builder = AsyncMock(return_value=[Comp.Plain("精确百科")])
+    monkeypatch.setattr(plugin_main, "build_tank_info_response", builder)
+    monkeypatch.setattr(plugin_main, "session_waiter", fake_session_waiter)
+
+    plugin = MyPlugin(context=MagicMock())
+    event = DummyEvent(
+        sender_id="10001",
+        message_str="坦克 野牛",
+        messages=[Comp.Plain("坦克 野牛")],
+    )
+
+    results = [item async for item in plugin.query_tank_info(event)]
+
+    assert results == [{"plain": "候选列表"}]
+    assert builder.await_args.args[0].explicit_name == "野牛 C45"
+    assert selection_event.sent == [[Comp.Plain("精确百科")]]
+    controller.stop.assert_called_once_with()
