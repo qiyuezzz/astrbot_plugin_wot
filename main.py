@@ -19,6 +19,7 @@ from data.plugins.astrbot_plugin_wot.src.application.query_service import (
     build_single_vehicle_response,
     build_tank_comparison_response,
     build_tank_info_response,
+    find_tank_comparison_candidates,
     find_tank_info_candidates,
     format_tank_info_candidates,
     handle_bind_command,
@@ -33,6 +34,7 @@ from data.plugins.astrbot_plugin_wot.src.application.tank_sync_service import (
 from data.plugins.astrbot_plugin_wot.src.infrastructure.network.http_client import (
     close_shared_session,
 )
+from data.plugins.astrbot_plugin_wot.src.domain.report import Tank
 from data.plugins.astrbot_plugin_wot.src.settings.storage import (
     prepare_tank_info_path,
 )
@@ -57,6 +59,49 @@ class _TankSelectionSessionFilter(SessionFilter):
 
     def filter(self, event: AstrMessageEvent) -> str:
         return f"{event.unified_msg_origin}:{event.get_sender_id()}"
+
+
+async def _wait_for_tank_selection(
+    event: AstrMessageEvent, candidates: list[Tank]
+) -> Tank | None:
+    selected: list[Tank] = []
+
+    @session_waiter(timeout=60)
+    async def _selection_waiter(
+        controller: SessionController,
+        waiting_event: AstrMessageEvent,
+    ) -> None:
+        try:
+            choice = waiting_event.message_str.strip().lstrip("/").strip()
+            if choice in {"取消", "退出"}:
+                await waiting_event.send(waiting_event.plain_result("已取消坦克查询。"))
+                controller.stop()
+                return
+            if not choice.isdigit():
+                await waiting_event.send(
+                    waiting_event.plain_result("请输入列表中的编号，或回复“取消”退出。")
+                )
+                controller.keep(timeout=60, reset_timeout=True)
+                return
+            index = int(choice) - 1
+            if not 0 <= index < len(candidates):
+                await waiting_event.send(
+                    waiting_event.plain_result(
+                        f"编号无效，请输入 1-{len(candidates)}，或回复“取消”退出。"
+                    )
+                )
+                controller.keep(timeout=60, reset_timeout=True)
+                return
+            selected.append(candidates[index])
+            controller.stop()
+        finally:
+            waiting_event.stop_event()
+
+    try:
+        await _selection_waiter(event, session_filter=_TankSelectionSessionFilter())
+    except TimeoutError:
+        await event.send(event.plain_result("选择已超时，请重新输入坦克名称查询。"))
+    return selected[0] if selected else None
 
 
 def _load_plugin_version() -> str:
@@ -256,60 +301,22 @@ class MyPlugin(Star):
                 yield event.plain_result(
                     format_tank_info_candidates(input.explicit_name, candidates)
                 )
-
-                @session_waiter(timeout=60)
-                async def _tank_selection_waiter(
-                    controller: SessionController,
-                    waiting_event: AstrMessageEvent,
-                ) -> None:
-                    try:
-                        choice = waiting_event.message_str.strip().lstrip("/").strip()
-                        if choice in {"取消", "退出"}:
-                            await waiting_event.send(
-                                waiting_event.plain_result("已取消坦克查询。")
-                            )
-                            controller.stop()
-                            return
-                        if not choice.isdigit():
-                            await waiting_event.send(
-                                waiting_event.plain_result("请输入列表中的编号，或回复“取消”退出。")
-                            )
-                            controller.keep(timeout=60, reset_timeout=True)
-                            return
-                        index = int(choice) - 1
-                        if not 0 <= index < len(candidates):
-                            await waiting_event.send(
-                                waiting_event.plain_result(
-                                    f"编号无效，请输入 1-{len(candidates)}，或回复“取消”退出。"
-                                )
-                            )
-                            controller.keep(timeout=60, reset_timeout=True)
-                            return
-
-                        selected_input = CommandInput(
-                            input.send_id,
-                            waiting_event.get_messages(),
-                            candidates[index].name,
-                            input.self_id,
-                        )
-                        chain = await build_tank_info_response(selected_input)
-                        await waiting_event.send(waiting_event.chain_result(chain))
-                        controller.stop()
-                    finally:
-                        waiting_event.stop_event()
-
                 try:
-                    await _tank_selection_waiter(
-                        event,
-                        session_filter=_TankSelectionSessionFilter(),
-                    )
-                except TimeoutError:
-                    yield event.plain_result("选择已超时，请重新输入坦克名称查询。")
+                    selected = await _wait_for_tank_selection(event, candidates)
                 except Exception as exc:
                     logger.exception(f"坦克候选选择失败 (坦克={input.explicit_name}): {exc}")
-                    yield event.plain_result("坦克查询失败，请重新输入坦克名称。")
-                finally:
-                    event.stop_event()
+                    await event.send(event.plain_result("坦克查询失败，请重新输入坦克名称。"))
+                    selected = None
+                if selected:
+                    selected_input = CommandInput(
+                        input.send_id,
+                        event.get_messages(),
+                        selected.name,
+                        input.self_id,
+                    )
+                    chain = await build_tank_info_response(selected_input)
+                    await event.send(event.chain_result(chain))
+                event.stop_event()
                 return
         chain = await build_tank_info_response(input)
         yield event.chain_result(chain)
@@ -320,6 +327,57 @@ class MyPlugin(Star):
     ):
         """对比两辆坦克的主要属性"""
         input = CommandInput.from_event(event, ["对比"], message_text)
+        comparison_candidates = (
+            find_tank_comparison_candidates(input.explicit_name or "")
+            if input.explicit_name
+            else None
+        )
+        if comparison_candidates:
+            pair, left_candidates, right_candidates = comparison_candidates
+            if left_candidates and right_candidates:
+                had_session = False
+                left = left_candidates[0]
+                right = right_candidates[0]
+                if len(left_candidates) > 1:
+                    yield event.plain_result(
+                        format_tank_info_candidates(
+                            pair[0], left_candidates, subject="第一辆坦克"
+                        )
+                    )
+                    had_session = True
+                    selected_left = await _wait_for_tank_selection(event, left_candidates)
+                    if not selected_left:
+                        event.stop_event()
+                        return
+                    left = selected_left
+                if len(right_candidates) > 1:
+                    prompt = format_tank_info_candidates(
+                        pair[1], right_candidates, subject="第二辆坦克"
+                    )
+                    if had_session:
+                        await event.send(event.plain_result(prompt))
+                    else:
+                        yield event.plain_result(prompt)
+                    had_session = True
+                    selected_right = await _wait_for_tank_selection(event, right_candidates)
+                    if not selected_right:
+                        event.stop_event()
+                        return
+                    right = selected_right
+
+                selected_input = CommandInput(
+                    input.send_id,
+                    event.get_messages(),
+                    f"{left.name} 和 {right.name}",
+                    input.self_id,
+                )
+                chain = await build_tank_comparison_response(selected_input)
+                if had_session:
+                    await event.send(event.chain_result(chain))
+                    event.stop_event()
+                else:
+                    yield event.chain_result(chain)
+                return
         chain = await build_tank_comparison_response(input)
         yield event.chain_result(chain)
 
@@ -351,6 +409,7 @@ class MyPlugin(Star):
         help_text += "- 坦克 [坦克名称]：查询坦克百科属性\n"
         help_text += "  名称匹配到多辆坦克时会返回编号列表，回复编号选择（60秒内有效）\n"
         help_text += "- 对比 [坦克A] 和 [坦克B]：对比两辆坦克的属性\n"
+        help_text += "  两辆坦克分别匹配到多个结果时，会依次返回编号列表供选择\n"
         help_text += "- 环线 [坦克名称]：查询坦克一环/二环/三环标伤阈值\n\n"
         help_text += "管理命令：\n"
         help_text += "- 同步坦克/更新坦克：融合官网与 WotInspector 的坦克信息\n\n"

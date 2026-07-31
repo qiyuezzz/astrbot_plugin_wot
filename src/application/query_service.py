@@ -30,6 +30,7 @@ from data.plugins.astrbot_plugin_wot.src.application.single_vehicle_service impo
 from data.plugins.astrbot_plugin_wot.src.application.tank_info_service import (
     build_tank_comparison_report,
     build_tank_info_report,
+    split_comparison_query,
 )
 from data.plugins.astrbot_plugin_wot.src.domain.report import Tank
 from data.plugins.astrbot_plugin_wot.src.infrastructure.repositories.tank_repository import (
@@ -44,9 +45,22 @@ def find_tank_info_candidates(tank_name: str) -> list[Tank]:
     return find_tank_candidates_by_name(tank_name)
 
 
-def format_tank_info_candidates(tank_name: str, candidates: list[Tank]) -> str:
+def find_tank_comparison_candidates(
+    argument: str,
+) -> tuple[tuple[str, str], list[Tank], list[Tank]] | None:
+    pair = split_comparison_query(argument)
+    if not pair:
+        return None
+    return pair, find_tank_info_candidates(pair[0]), find_tank_info_candidates(pair[1])
+
+
+def format_tank_info_candidates(
+    tank_name: str,
+    candidates: list[Tank],
+    subject: str = "坦克名称",
+) -> str:
     """构建坦克候选列表，供会话控制器等待编号选择。"""
-    lines = [f"坦克名称「{tank_name}」匹配到多个结果，请回复编号选择："]
+    lines = [f"{subject}「{tank_name}」匹配到多个结果，请回复编号选择："]
     for index, tank in enumerate(candidates, start=1):
         tags = f"{tank.tier}级 · {tank.nation.display_name} · {tank.type.display_name}"
         if tank.role.display_name not in ("", "通用/无定位"):

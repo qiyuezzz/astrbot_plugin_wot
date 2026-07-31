@@ -93,6 +93,7 @@ def render_text_report_html(
     sections = [section.strip() for section in text.split("\n\n") if section.strip()]
     table = _build_table(layout, sections)
     cards, card_footer = _build_cards(layout, sections)
+    intro_groups = _build_intro_groups(layout, cards)
     card_columns = _distribute_card_columns(
         cards[1:] if cards else [], 4 if layout == "tank_detail" else 3
     )
@@ -105,6 +106,7 @@ def render_text_report_html(
         cards=cards,
         card_columns=card_columns,
         card_footer=card_footer,
+        intro_groups=intro_groups,
         hero_images=hero_images,
     )
 
@@ -145,25 +147,51 @@ def _build_cards(
                 rows.append({"label": "", "value": stripped, "kind": "full"})
         cards.append({"title": title, "rows": rows})
     if cards:
-        intro_rows = cards[0]["rows"]
-        if isinstance(intro_rows, list):
-            split_rows: list[dict[str, str]] = []
-            for row in intro_rows:
-                value = str(row.get("value") or "")
-                if not row.get("label") and " · " in value:
-                    split_rows.extend(
-                        {
-                            "label": "",
-                            "value": item.strip(),
-                            "kind": "intro-meta",
-                        }
-                        for item in value.split(" · ")
-                        if item.strip()
-                    )
-                else:
-                    split_rows.append(row)
-            cards[0]["rows"] = split_rows
+        if layout != "tank_compare":
+            cards[0]["rows"] = _split_intro_meta_rows(cards[0]["rows"])
     return cards, footer
+
+
+def _split_intro_meta_rows(rows: object) -> list[dict[str, str]]:
+    if not isinstance(rows, list):
+        return []
+    split_rows: list[dict[str, str]] = []
+    for row in rows:
+        value = str(row.get("value") or "")
+        if not row.get("label") and " · " in value:
+            split_rows.extend(
+                {
+                    "label": "",
+                    "value": item.strip(),
+                    "kind": "intro-meta",
+                }
+                for item in value.split(" · ")
+                if item.strip()
+            )
+        else:
+            split_rows.append(row)
+    return split_rows
+
+
+def _build_intro_groups(
+    layout: ReportLayout,
+    cards: list[dict[str, object]] | None,
+) -> list[list[dict[str, str]]]:
+    if not cards:
+        return []
+    rows = cards[0].get("rows")
+    if layout != "tank_compare" or not isinstance(rows, list):
+        return [rows] if isinstance(rows, list) else []
+    if not rows:
+        return []
+    value = str(rows[0].get("value") or "")
+    if " | " not in value:
+        return [_split_intro_meta_rows(rows)]
+    left, right = value.split(" | ", 1)
+    return [
+        _split_intro_meta_rows([{"label": "", "value": left, "kind": "full"}]),
+        _split_intro_meta_rows([{"label": "", "value": right, "kind": "full"}]),
+    ]
 
 
 def _distribute_card_columns(

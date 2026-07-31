@@ -119,6 +119,33 @@
       object-fit: contain;
       filter: drop-shadow(0 18px 18px rgba(25, 35, 55, 0.22));
     }
+    .compare-gallery .hero-item {
+      display: flex;
+      flex-direction: column;
+    }
+    .compare-gallery .hero-item img {
+      height: 228px;
+      min-height: 0;
+      flex: 1;
+    }
+    .compare-hero-meta {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      min-height: 52px;
+      padding: 6px 12px;
+      border-bottom: 1px solid rgba(220, 228, 238, 0.75);
+    }
+    .compare-hero-meta .data-row.intro-meta {
+      flex: 0 0 auto;
+      width: auto;
+      padding: 3px 12px;
+      border-right: 1px solid rgba(220, 228, 238, 0.75);
+      border-bottom: 0;
+      font-size: 21px;
+    }
+    .compare-hero-meta .data-row.intro-meta:last-child { border-right: 0; }
+    .compare-hero-meta .data-row.intro-meta .data-value { text-align: left; }
     .hero-label {
       position: absolute;
       left: 20px;
@@ -287,15 +314,26 @@
       {% elif cards %}
       <div class="tank-intro{% if not hero_images %} no-hero{% endif %}">
         {% if hero_images %}
-        <div class="hero-gallery">
+        <div class="hero-gallery{% if layout == 'tank_compare' %} compare-gallery{% endif %}">
           {% for label, image_url in hero_images %}
           <figure class="hero-item">
+            {% if layout == "tank_compare" and intro_groups and loop.index0 < intro_groups|length %}
+            <div class="compare-hero-meta">
+              {% for row in intro_groups[loop.index0] %}
+              <div class="data-row {{ row.kind }}">
+                {% if row.label %}<span class="data-label">{{ row.label }}</span>{% endif %}
+                <span class="data-value">{{ row.value }}</span>
+              </div>
+              {% endfor %}
+            </div>
+            {% endif %}
             <img src="{{ image_url }}" alt="{{ label }}" referrerpolicy="no-referrer">
             <figcaption class="hero-label">{{ label }}</figcaption>
           </figure>
           {% endfor %}
         </div>
         {% endif %}
+        {% if layout != "tank_compare" or not hero_images %}
         <section class="tank-intro-info">
           <div class="card-body">
             {% for row in cards[0].rows %}
@@ -306,6 +344,7 @@
             {% endfor %}
           </div>
         </section>
+        {% endif %}
       </div>
       <div class="card-grid {{ layout }}">
         {% for column in card_columns %}

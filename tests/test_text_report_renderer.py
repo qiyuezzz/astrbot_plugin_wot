@@ -68,3 +68,24 @@ def test_render_tank_detail_as_cards_with_vehicle_image():
     assert '<span class="data-label">射击俯角</span>' in html
     assert '<span class="data-value">-7°</span>' in html
     assert "数据来源：坦克营地（基础配置）" in html
+
+
+def test_render_tank_comparison_keeps_meta_with_each_vehicle_image():
+    html = render_text_report_html(
+        "坦克对比",
+        "坦克对比：野牛 vs 59式\n"
+        "3级 · 德国 · 火炮 | 8级 · 中国 · 中坦\n\n"
+        "【火力与炮控】\n项目：野牛 | 59式\n伤害，HP：350 | 250\n\n"
+        "数据来源：坦克营地（优选配置）",
+        layout="tank_compare",
+        hero_images=(
+            ("野牛", "https://example.com/bison.png"),
+            ("59式", "https://example.com/type59.png"),
+        ),
+    )
+
+    assert 'class="hero-gallery compare-gallery"' in html
+    assert html.count('class="compare-hero-meta"') == 2
+    assert html.count('class="data-value">3级</span>') == 1
+    assert html.count('class="data-value">8级</span>') == 1
+    assert '<section class="tank-intro-info">' not in html

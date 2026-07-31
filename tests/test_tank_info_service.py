@@ -212,7 +212,7 @@ async def test_build_tank_info_report_uses_detailed_camp_data(monkeypatch):
     assert "【视野与隐蔽】" in report.text
     assert "静止隐蔽系数（%）：15.68" in report.text
     mobility_text = report.text.split("【机动性能】", 1)[1].split("\n\n", 1)[0]
-    assert "发动机型号：59式发动机" in mobility_text
+    assert "发动机型号：" not in mobility_text
     assert "发动机等级：8级" in mobility_text
     assert "起火几率，%：12" in mobility_text
     firepower_text = report.text.split("【火力与炮控】", 1)[1].split("\n\n", 1)[0]
@@ -237,7 +237,7 @@ async def test_build_tank_comparison_report_uses_both_profiles(monkeypatch):
     assert "伤害，HP：250/250/500 | 390/390/500" in report.text
     assert "射击俯角：-7° | -7°" in report.text
     mobility_text = report.text.split("【机动性能】", 1)[1].split("\n\n", 1)[0]
-    assert "发动机型号：59式发动机 | 查狄伦 25t发动机" in mobility_text
+    assert "发动机型号：" not in mobility_text
     assert "起火几率，%：12 | 12" in mobility_text
     assert "【模块配置" not in report.text
     assert len(report.hero_images) == 2

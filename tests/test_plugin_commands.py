@@ -593,5 +593,63 @@ async def test_query_tank_info_uses_session_for_ambiguous_name(
 
     assert results == [{"plain": "候选列表"}]
     assert builder.await_args.args[0].explicit_name == "野牛 C45"
-    assert selection_event.sent == [[Comp.Plain("精确百科")]]
+    assert len(event.sent) == 1
+    assert event.sent[0][0].text == "精确百科"
     controller.stop.assert_called_once_with()
+
+
+@pytest.mark.asyncio
+async def test_query_tank_comparison_selects_both_ambiguous_names(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    left_candidates = [SimpleNamespace(name="野牛"), SimpleNamespace(name="C45 野牛")]
+    right_candidates = [SimpleNamespace(name="59式"), SimpleNamespace(name="黄金59式")]
+    selection_events = [
+        DummyEvent("10001", "2", [Comp.Plain("2")]),
+        DummyEvent("10001", "1", [Comp.Plain("1")]),
+    ]
+    controller = MagicMock()
+    session_index = 0
+
+    def fake_session_waiter(*, timeout):
+        assert timeout == 60
+
+        def decorator(handler):
+            async def wrapper(event, session_filter=None):
+                nonlocal session_index
+                selection_event = selection_events[session_index]
+                session_index += 1
+                await handler(controller, selection_event)
+
+            return wrapper
+
+        return decorator
+
+    monkeypatch.setattr(
+        plugin_main,
+        "find_tank_comparison_candidates",
+        lambda _argument: (("野牛", "59"), left_candidates, right_candidates),
+    )
+    monkeypatch.setattr(
+        plugin_main,
+        "format_tank_info_candidates",
+        lambda _name, _candidates, subject="": subject,
+    )
+    builder = AsyncMock(return_value=[Comp.Plain("对比结果")])
+    monkeypatch.setattr(plugin_main, "build_tank_comparison_response", builder)
+    monkeypatch.setattr(plugin_main, "session_waiter", fake_session_waiter)
+
+    plugin = MyPlugin(context=MagicMock())
+    event = DummyEvent(
+        sender_id="10001",
+        message_str="对比 野牛 59",
+        messages=[Comp.Plain("对比 野牛 59")],
+    )
+
+    results = [item async for item in plugin.query_tank_comparison(event)]
+
+    assert results == [{"plain": "第一辆坦克"}]
+    assert event.sent[0] == {"plain": "第二辆坦克"}
+    assert event.sent[1][0].text == "对比结果"
+    assert builder.await_args.args[0].explicit_name == "C45 野牛 和 59式"
+    assert controller.stop.call_count == 2

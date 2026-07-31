@@ -12,6 +12,7 @@ from data.plugins.astrbot_plugin_wot.src.infrastructure.api_clients.wotbox_camp_
     fetch_tank_wiki_summary,
 )
 from data.plugins.astrbot_plugin_wot.src.infrastructure.repositories.tank_repository import (
+    find_tank_candidates_by_name,
     find_tanks_by_name,
     get_tank_full_info,
 )
@@ -223,7 +224,7 @@ def _engine_module_lines(profile: dict) -> list[str]:
     fitting = _find_fitting(profile, "engine")
     if not fitting:
         return []
-    lines = [f"发动机型号：{_clean_name(str(fitting.get('title') or '未知'))}"]
+    lines: list[str] = []
     tier = str(fitting.get("tier") or "")
     if tier:
         lines.append(f"发动机等级：{tier}")
@@ -287,7 +288,9 @@ def split_comparison_query(argument: str) -> tuple[str, str] | None:
     for index in range(1, len(parts)):
         left = " ".join(parts[:index])
         right = " ".join(parts[index:])
-        if len(find_tanks_by_name(left)) == 1 and len(find_tanks_by_name(right)) == 1:
+        if (find_tanks_by_name(left) or find_tank_candidates_by_name(left)) and (
+            find_tanks_by_name(right) or find_tank_candidates_by_name(right)
+        ):
             candidates.append((left, right))
     return candidates[0] if len(candidates) == 1 else None
 
@@ -399,9 +402,6 @@ def _engine_comparison_lines(left_profile: dict, right_profile: dict) -> list[st
     left = _find_fitting(left_profile, "engine") or {}
     right = _find_fitting(right_profile, "engine") or {}
     lines = [
-        "发动机型号："
-        f"{_clean_name(str(left.get('title') or '-'))} | "
-        f"{_clean_name(str(right.get('title') or '-'))}",
         f"发动机等级：{left.get('tier') or '-'} | {right.get('tier') or '-'}",
     ]
     left_details = {
