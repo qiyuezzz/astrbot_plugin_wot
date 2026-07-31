@@ -75,3 +75,30 @@ def get_tank_info_by_name(tank_name: str) -> Tank:
             type=TankTypeEnum.UNKNOWN,
             role=TankRoleEnum.NONE,
         )
+
+
+def _normalize_tank_name(name: str) -> str:
+    """去引号、折叠空白并转小写，用于容错匹配坦克名。"""
+    if not name:
+        return ""
+    for quote in '"“”‘’\'"':
+        name = name.replace(quote, "")
+    return " ".join(name.strip().lower().split())
+
+
+def find_tank_by_name(tank_name: str) -> Tank | None:
+    """按坦克名查找坦克，支持去引号容错（例如输入 鞭蛇 匹配 "鞭蛇"）。"""
+    if not tank_name:
+        return None
+    tank_db = _load_tank_db()
+    if tank_name in tank_db:
+        return get_tank_info_by_name(tank_name)
+
+    normalized = _normalize_tank_name(tank_name)
+    for candidate, payload in tank_db.items():
+        payload_name = payload.get("name", "") if isinstance(payload, dict) else ""
+        if _normalize_tank_name(candidate) == normalized or _normalize_tank_name(
+            payload_name
+        ) == normalized:
+            return get_tank_info_by_name(candidate)
+    return None

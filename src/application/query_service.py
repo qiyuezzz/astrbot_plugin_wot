@@ -9,9 +9,14 @@ from astrbot.api.event import AstrMessageEvent
 from data.plugins.astrbot_plugin_wot.src.application.efficiency_service import (
     get_basic_efficiency_text,
 )
+from data.plugins.astrbot_plugin_wot.src.application.garage_service import (
+    build_garage_text,
+)
 from data.plugins.astrbot_plugin_wot.src.application.message_parser import CommandInput
+from data.plugins.astrbot_plugin_wot.src.application.moe_service import build_moe_text
 from data.plugins.astrbot_plugin_wot.src.application.player_resolver import (
     error_message,
+    resolve_player_account,
     resolve_player_name,
 )
 
@@ -81,3 +86,35 @@ async def build_report_response(
         ]
 
     return await _with_player(input, _query)
+
+
+async def build_garage_response(input: CommandInput) -> MessageChain:
+    """构建车库查询的响应消息链"""
+    player_name, account_id, err = await resolve_player_account(
+        input.send_id, input.message_chain, input.explicit_name, input.self_id
+    )
+    if err:
+        return _error_chain(input.send_id, err)
+    try:
+        text = await build_garage_text(player_name, account_id)
+    except Exception as exc:
+        logger.exception(
+            f"车库查询失败 (玩家={player_name}, 用户={input.send_id}): {exc}"
+        )
+        return _error_chain(input.send_id, "查询失败，请稍后再试")
+    return [Comp.At(qq=input.send_id), Comp.Plain(text)]
+
+
+async def build_moe_response(input: CommandInput) -> MessageChain:
+    """构建环线标伤查询的响应消息链"""
+    if not input.explicit_name:
+        return [
+            Comp.At(qq=input.send_id),
+            Comp.Plain("请提供坦克名称，例如：环线 鞭蛇"),
+        ]
+    try:
+        text = await build_moe_text(input.explicit_name)
+    except Exception as exc:
+        logger.exception(f"环线查询失败 (坦克={input.explicit_name}): {exc}")
+        return _error_chain(input.send_id, "查询失败，请稍后再试")
+    return [Comp.At(qq=input.send_id), Comp.Plain(text)]

@@ -9,11 +9,15 @@ from data.plugins.astrbot_plugin_wot.src.application.message_parser import (
 )
 from data.plugins.astrbot_plugin_wot.src.domain.player import AccountInfo
 from data.plugins.astrbot_plugin_wot.src.infrastructure.repositories.bindings_repository import (
+    read_binding_info,
     read_binding_data,
 )
 from data.plugins.astrbot_plugin_wot.src.settings.message import (
     CheckBindMsg,
     WotBindMsg,
+)
+from data.plugins.astrbot_plugin_wot.src.application.wotbox_account_service import (
+    search_player_account,
 )
 
 
@@ -69,6 +73,62 @@ def error_message(err: str) -> str:
     if err == "network_error":
         return "网络异常，无法校验玩家名称，请稍后再试"
     return "查询失败，请稍后再试"
+
+
+async def resolve_player_account(
+    send_id: str,
+    message_chain: list,
+    explicit_name: str | None,
+    self_id: str | None = None,
+) -> tuple[str | None, str | None, str | None]:
+    """解析玩家名称与坦克营地 account_id，返回 (名称, account_id, 错误码)。
+
+    优先级：显式名称 > @目标绑定 > 发送者自身绑定。
+    """
+    at_target = extract_at_target_id(message_chain, self_id)
+
+    async def _from_binding(target: str) -> tuple[str | None, str | None, str | None]:
+        info = read_binding_info(target)
+        if not info:
+            return None, None, "target_unbound"
+        if info.account_id:
+            return info.name, info.account_id, None
+        try:
+            lookup = await search_player_account(info.name)
+        except Exception:
+            return None, None, "network_error"
+        if lookup is None:
+            return None, None, "target_unbound"
+        return lookup.player_name, lookup.account_id, None
+
+    if explicit_name:
+        if at_target:
+            return await _from_binding(at_target)
+        if explicit_name.startswith("@"):
+            return None, None, "at_text_only"
+        try:
+            lookup = await search_player_account(explicit_name)
+        except Exception:
+            return None, None, "network_error"
+        if lookup is None:
+            return None, None, "player_not_found"
+        return lookup.player_name, lookup.account_id, None
+
+    if at_target:
+        return await _from_binding(at_target)
+
+    info = read_binding_info(send_id)
+    if not info:
+        return None, None, "self_unbound"
+    if info.account_id:
+        return info.name, info.account_id, None
+    try:
+        lookup = await search_player_account(info.name)
+    except Exception:
+        return None, None, "network_error"
+    if lookup is None:
+        return None, None, "self_unbound"
+    return lookup.player_name, lookup.account_id, None
 
 
 async def execute_bind(send_id: str, message_str: str) -> str:

@@ -11,7 +11,9 @@ from data.plugins.astrbot_plugin_wot.src.application.message_parser import (
     extract_text_after_leading_at,
 )
 from data.plugins.astrbot_plugin_wot.src.application.query_service import (
+    build_garage_response,
     build_efficiency_response,
+    build_moe_response,
     build_report_response,
     handle_bind_command,
 )
@@ -118,6 +120,8 @@ class MyPlugin(Star):
             ],
             ([*EFFICIENCY_COMMANDS], self.query_basic_efficiency),
             (["wot绑定"], self.wot_bind_player_name),
+            (["车库"], self.query_garage),
+            (["环线", "标伤"], self.query_moe),
             (["同步坦克", "更新坦克"], self.sync_full_tank_info),
             (["帮助"], self.show_help),
         ]
@@ -208,6 +212,20 @@ class MyPlugin(Star):
         result = await sync_all_tank_info()
         yield event.plain_result(result)
 
+    @filter.command("车库")
+    async def query_garage(self, event: AstrMessageEvent, message_text: str | None = None):
+        """查询玩家车库坦克战绩"""
+        input = CommandInput.from_event(event, ["车库"], message_text)
+        chain = await build_garage_response(input)
+        yield event.chain_result(chain)
+
+    @filter.command("环线", alias={"标伤"})
+    async def query_moe(self, event: AstrMessageEvent, message_text: str | None = None):
+        """查询坦克一环/二环/三环标伤"""
+        input = CommandInput.from_event(event, ["环线", "标伤"], message_text)
+        chain = await build_moe_response(input)
+        yield event.chain_result(chain)
+
     @filter.command("帮助")
     async def show_help(self, event: AstrMessageEvent):
         """显示所有可用命令及其说明"""
@@ -223,6 +241,8 @@ class MyPlugin(Star):
         help_text += "- 两日效率/两日战绩 [玩家名称]：查询两日效率和战绩\n"
         help_text += "- 三日效率/三日战绩 [玩家名称]：查询三日效率和战绩\n"
         help_text += "- 百场效率/百场战绩 [玩家名称]：查询百场效率和战绩\n\n"
+        help_text += "- 车库 [玩家名称]：查询玩家车库的坦克战绩（WN8、胜率等）\n"
+        help_text += "- 环线 [坦克名称]：查询坦克一环/二环/三环标伤阈值\n\n"
         help_text += "管理命令：\n"
         help_text += "- 同步坦克/更新坦克：融合官网与 WotInspector 的坦克信息\n\n"
         help_text += "使用说明：\n"

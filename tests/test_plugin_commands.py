@@ -332,3 +332,54 @@ async def test_command_router_handles_zh_help_only(monkeypatch: pytest.MonkeyPat
     )
     en_results = [item async for item in plugin.command_router(en_event)]
     assert en_results == []
+
+
+@pytest.mark.asyncio
+async def test_command_router_handles_garage(monkeypatch: pytest.MonkeyPatch):
+    async def _fake_query_garage(_event):
+        yield "garage-ok"
+
+    plugin = MyPlugin(context=MagicMock())
+    monkeypatch.setattr(plugin, "query_garage", _fake_query_garage)
+    event = DummyEvent(
+        sender_id="10001",
+        message_str="车库",
+        messages=[Comp.Plain("车库")],
+    )
+    results = [item async for item in plugin.command_router(event)]
+    assert results == ["garage-ok"]
+
+
+@pytest.mark.asyncio
+async def test_query_garage_command_returns_chain(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        "data.plugins.astrbot_plugin_wot.main.build_garage_response",
+        AsyncMock(return_value=[Comp.At(qq="10001"), Comp.Plain("车库文本")]),
+    )
+    plugin = MyPlugin(context=MagicMock())
+    event = DummyEvent(
+        sender_id="10001",
+        message_str="/车库",
+        messages=[Comp.Plain("/车库")],
+    )
+    results = [item async for item in plugin.query_garage(event)]
+    assert len(results) == 1
+    assert isinstance(results[0][1], Comp.Plain)
+    assert results[0][1].text == "车库文本"
+
+
+@pytest.mark.asyncio
+async def test_query_moe_command_returns_chain(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        "data.plugins.astrbot_plugin_wot.main.build_moe_response",
+        AsyncMock(return_value=[Comp.At(qq="10001"), Comp.Plain("环线文本")]),
+    )
+    plugin = MyPlugin(context=MagicMock())
+    event = DummyEvent(
+        sender_id="10001",
+        message_str="/环线 鞭蛇",
+        messages=[Comp.Plain("/环线 鞭蛇")],
+    )
+    results = [item async for item in plugin.query_moe(event)]
+    assert len(results) == 1
+    assert results[0][1].text == "环线文本"

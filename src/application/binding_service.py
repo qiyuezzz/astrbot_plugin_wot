@@ -36,7 +36,9 @@ async def bind_user_name(send_id: str, player_name: str) -> AccountInfo | None:
             }
             account_info = AccountInfo(**filtered_data)
             logger.info(account_info.__str__())
-            await write_binding_data(send_id, account_info.account_name)
+            await write_binding_data(
+                send_id, account_info.account_name, account_info.account_id
+            )
             return account_info
 
         logger.info("未找到该用户")
