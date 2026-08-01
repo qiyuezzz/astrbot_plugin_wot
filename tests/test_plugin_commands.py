@@ -15,11 +15,11 @@ from data.plugins.astrbot_plugin_wot.src.application.player_resolver import (
     resolve_player_name,
 )
 from data.plugins.astrbot_plugin_wot.src.application.query_service import (
+    build_career_response,
     build_efficiency_response,
     build_garage_response,
     build_moe_response,
     build_report_response,
-    build_single_vehicle_response,
     build_tank_comparison_response,
     build_tank_info_response,
 )
@@ -373,6 +373,27 @@ async def test_build_garage_response_separates_player_and_filters(
 
 
 @pytest.mark.asyncio
+async def test_build_career_response_returns_image(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(
+        "data.plugins.astrbot_plugin_wot.src.application.query_service.resolve_player_account",
+        AsyncMock(return_value=("Tester", "123", None)),
+    )
+    monkeypatch.setattr(
+        "data.plugins.astrbot_plugin_wot.src.application.query_service.build_career_text",
+        AsyncMock(return_value="标准模式总览"),
+    )
+    monkeypatch.setattr(
+        "data.plugins.astrbot_plugin_wot.src.application.query_service.generate_text_report",
+        AsyncMock(return_value="https://example.com/career.jpg"),
+    )
+
+    result = await build_career_response(CommandInput("10001", [], None))
+
+    assert isinstance(result[1], Comp.Image)
+    assert result[1].file == "https://example.com/career.jpg"
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("builder_name", "response_fn", "argument", "title"),
     [
@@ -385,7 +406,7 @@ async def test_build_garage_response_separates_player_and_filters(
         (
             "build_tank_comparison_report",
             build_tank_comparison_response,
-            "59式 和 查狄伦 25t",
+            "59式 查狄伦 25t",
             "坦克对比",
         ),
     ],
@@ -416,35 +437,6 @@ async def test_tank_reference_responses_render_images(
     assert isinstance(result[1], Comp.Image)
     assert renderer.await_args.args[1] == title
     assert renderer.await_args.kwargs["hero_images"][0][0] == "59式"
-
-
-@pytest.mark.asyncio
-async def test_build_single_vehicle_response_returns_image(
-    monkeypatch: pytest.MonkeyPatch,
-):
-    monkeypatch.setattr(
-        "data.plugins.astrbot_plugin_wot.src.application.query_service.parse_single_vehicle_query",
-        MagicMock(
-            return_value=MagicMock(player_name=None, tank_name="59式")
-        ),
-    )
-    monkeypatch.setattr(
-        "data.plugins.astrbot_plugin_wot.src.application.query_service.resolve_player_account",
-        AsyncMock(return_value=("Tester", "123", None)),
-    )
-    monkeypatch.setattr(
-        "data.plugins.astrbot_plugin_wot.src.application.query_service.build_single_vehicle_text",
-        AsyncMock(return_value="单车详情"),
-    )
-    monkeypatch.setattr(
-        "data.plugins.astrbot_plugin_wot.src.application.query_service.generate_text_report",
-        AsyncMock(return_value="https://example.com/single.jpg"),
-    )
-
-    result = await build_single_vehicle_response(CommandInput("10001", [], "59式"))
-
-    assert isinstance(result[1], Comp.Image)
-    assert result[1].file == "https://example.com/single.jpg"
 
 
 @pytest.mark.asyncio
@@ -490,6 +482,97 @@ async def test_command_router_handles_zh_help_only(monkeypatch: pytest.MonkeyPat
 
 
 @pytest.mark.asyncio
+async def test_show_help_returns_command_list_as_image(monkeypatch: pytest.MonkeyPatch):
+    generate_text_report = AsyncMock(return_value="https://example.com/help.jpg")
+    monkeypatch.setattr(
+        "data.plugins.astrbot_plugin_wot.main.generate_text_report",
+        generate_text_report,
+    )
+    plugin = MyPlugin(context=MagicMock())
+    event = DummyEvent(
+        sender_id="10001",
+        message_str="帮助",
+        messages=[Comp.Plain("帮助")],
+    )
+
+    results = [item async for item in plugin.show_help(event)]
+
+    assert len(results) == 1
+    assert isinstance(results[0][1], Comp.Image)
+    assert results[0][1].file == "https://example.com/help.jpg"
+    help_text = generate_text_report.call_args.args[2]
+    for command in (
+        "wot绑定",
+        "效率 / 盒子效率",
+        "今日效率 / 今日战绩",
+        "昨日效率 / 昨日战绩",
+        "两日效率 / 两日战绩",
+        "三日效率 / 三日战绩",
+        "百场效率 / 百场战绩",
+        "车库",
+        "坦克生涯",
+        "坦克信息",
+        "坦克对比",
+        "环线 / 标伤",
+        "同步坦克 / 更新坦克",
+        "帮助",
+    ):
+        assert command in help_text
+    assert "单车" not in help_text
+    assert "坦克 [坦克名称]" not in help_text
+    assert "\n对比 [坦克A]" not in help_text
+    assert "参数可单独或组合使用，顺序不限" in help_text
+    assert "车库 玩家名 10级 重坦" in help_text
+    assert "不支持无空格连写" in help_text
+    assert "分别查询今日、昨日、近两日、近三日或最近百场战绩；用法相同" in help_text
+    assert generate_text_report.call_args.kwargs["layout"] == "help"
+    assert generate_text_report.call_args.kwargs["width"] == 2200
+
+
+@pytest.mark.asyncio
+async def test_command_router_uses_renamed_tank_commands(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    async def _fake_tank_info(_event):
+        yield "tank-info-ok"
+
+    async def _fake_tank_comparison(_event):
+        yield "tank-comparison-ok"
+
+    plugin = MyPlugin(context=MagicMock())
+    monkeypatch.setattr(plugin, "query_tank_info", _fake_tank_info)
+    monkeypatch.setattr(plugin, "query_tank_comparison", _fake_tank_comparison)
+
+    info_event = DummyEvent(
+        sender_id="10001",
+        message_str="坦克信息 59式",
+        messages=[Comp.Plain("坦克信息 59式")],
+    )
+    comparison_event = DummyEvent(
+        sender_id="10001",
+        message_str="坦克对比 59式 查狄伦 25t",
+        messages=[Comp.Plain("坦克对比 59式 查狄伦 25t")],
+    )
+    old_info_event = DummyEvent(
+        sender_id="10001",
+        message_str="坦克 59式",
+        messages=[Comp.Plain("坦克 59式")],
+    )
+    old_comparison_event = DummyEvent(
+        sender_id="10001",
+        message_str="对比 59式 查狄伦 25t",
+        messages=[Comp.Plain("对比 59式 查狄伦 25t")],
+    )
+
+    assert [item async for item in plugin.command_router(info_event)] == ["tank-info-ok"]
+    assert [item async for item in plugin.command_router(comparison_event)] == [
+        "tank-comparison-ok"
+    ]
+    assert [item async for item in plugin.command_router(old_info_event)] == []
+    assert [item async for item in plugin.command_router(old_comparison_event)] == []
+
+
+@pytest.mark.asyncio
 async def test_command_router_handles_garage(monkeypatch: pytest.MonkeyPatch):
     async def _fake_query_garage(_event):
         yield "garage-ok"
@@ -503,6 +586,22 @@ async def test_command_router_handles_garage(monkeypatch: pytest.MonkeyPatch):
     )
     results = [item async for item in plugin.command_router(event)]
     assert results == ["garage-ok"]
+
+
+@pytest.mark.asyncio
+async def test_command_router_handles_career(monkeypatch: pytest.MonkeyPatch):
+    async def _fake_query_career(_event):
+        yield "career-ok"
+
+    plugin = MyPlugin(context=MagicMock())
+    monkeypatch.setattr(plugin, "query_career", _fake_query_career)
+    event = DummyEvent(
+        sender_id="10001",
+        message_str="坦克生涯",
+        messages=[Comp.Plain("坦克生涯")],
+    )
+    results = [item async for item in plugin.command_router(event)]
+    assert results == ["career-ok"]
 
 
 @pytest.mark.asyncio
@@ -585,8 +684,8 @@ async def test_query_tank_info_uses_session_for_ambiguous_name(
     plugin = MyPlugin(context=MagicMock())
     event = DummyEvent(
         sender_id="10001",
-        message_str="坦克 野牛",
-        messages=[Comp.Plain("坦克 野牛")],
+        message_str="坦克信息 野牛",
+        messages=[Comp.Plain("坦克信息 野牛")],
     )
 
     results = [item async for item in plugin.query_tank_info(event)]
@@ -596,6 +695,46 @@ async def test_query_tank_info_uses_session_for_ambiguous_name(
     assert len(event.sent) == 1
     assert event.sent[0][0].text == "精确百科"
     controller.stop.assert_called_once_with()
+
+
+@pytest.mark.asyncio
+async def test_tank_selection_only_prompts_once_for_invalid_choices(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    candidate = SimpleNamespace(name="59式")
+    waiting_events = [
+        DummyEvent("10001", "不是编号", [Comp.Plain("不是编号")]),
+        DummyEvent("10001", "99", [Comp.Plain("99")]),
+        DummyEvent("10001", "1", [Comp.Plain("1")]),
+    ]
+    controller = MagicMock()
+
+    def fake_session_waiter(*, timeout):
+        assert timeout == 60
+
+        def decorator(handler):
+            async def wrapper(event, session_filter=None):
+                for waiting_event in waiting_events:
+                    await handler(controller, waiting_event)
+
+            return wrapper
+
+        return decorator
+
+    monkeypatch.setattr(plugin_main, "session_waiter", fake_session_waiter)
+
+    selected = await plugin_main._wait_for_tank_selection(
+        waiting_events[0], [candidate]
+    )
+
+    assert selected is candidate
+    assert len(waiting_events[0].sent) == 1
+    assert waiting_events[0].sent[0] == {
+        "plain": "请输入列表中的编号，或回复“取消”退出。"
+    }
+    assert waiting_events[1].sent == []
+    assert controller.keep.call_count == 2
+    controller.keep.assert_called_with(timeout=60, reset_timeout=False)
 
 
 @pytest.mark.asyncio
@@ -642,8 +781,8 @@ async def test_query_tank_comparison_selects_both_ambiguous_names(
     plugin = MyPlugin(context=MagicMock())
     event = DummyEvent(
         sender_id="10001",
-        message_str="对比 野牛 59",
-        messages=[Comp.Plain("对比 野牛 59")],
+        message_str="坦克对比 野牛 59",
+        messages=[Comp.Plain("坦克对比 野牛 59")],
     )
 
     results = [item async for item in plugin.query_tank_comparison(event)]

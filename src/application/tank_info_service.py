@@ -275,8 +275,10 @@ async def build_tank_info_report(tank_name: str) -> TankReport:
 
 
 def split_comparison_query(argument: str) -> tuple[str, str] | None:
-    """将两个允许包含空格的坦克名称拆开；推荐使用“和”分隔。"""
+    """将两个允许包含空格的坦克名称拆开；坦克名之间必须有分隔。"""
     argument = argument.strip()
+    if "和" in argument and " 和 " not in argument:
+        return None
     for separator in (" 和 ", " vs ", " VS ", " / ", " 对比 "):
         if separator in argument:
             left, right = argument.split(separator, 1)
@@ -298,7 +300,7 @@ def split_comparison_query(argument: str) -> tuple[str, str] | None:
 def build_tank_comparison_text(argument: str) -> str:
     pair = split_comparison_query(argument)
     if not pair:
-        return "请提供两辆坦克，并用“和”分隔，例如：对比 59式 和 查狄伦 25t"
+        return "请提供两辆坦克，名称之间保留空格，例如：坦克对比 59式 查狄伦 25t"
     left_name, right_name = pair
     left_matches = find_tanks_by_name(left_name)
     right_matches = find_tanks_by_name(right_name)
@@ -466,7 +468,9 @@ async def build_tank_comparison_report(argument: str) -> TankReport:
     """构建带双车图片的完整参数对比。"""
     pair = split_comparison_query(argument)
     if not pair:
-        return TankReport("请提供两辆坦克，并用“和”分隔，例如：对比 59式 和 查狄伦 25t")
+        return TankReport(
+            "请提供两辆坦克，名称之间保留空格，例如：坦克对比 59式 查狄伦 25t"
+        )
     left_matches = find_tanks_by_name(pair[0])
     right_matches = find_tanks_by_name(pair[1])
     if not left_matches or not right_matches or len(left_matches) != 1 or len(right_matches) != 1:

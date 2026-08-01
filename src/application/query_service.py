@@ -6,6 +6,9 @@ from typing import Any
 import astrbot.api.message_components as Comp
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent
+from data.plugins.astrbot_plugin_wot.src.application.career_service import (
+    build_career_text,
+)
 from data.plugins.astrbot_plugin_wot.src.application.efficiency_service import (
     get_basic_efficiency_text,
 )
@@ -22,10 +25,6 @@ from data.plugins.astrbot_plugin_wot.src.application.player_resolver import (
 )
 from data.plugins.astrbot_plugin_wot.src.application.report.text_report_renderer import (
     generate_text_report,
-)
-from data.plugins.astrbot_plugin_wot.src.application.single_vehicle_service import (
-    build_single_vehicle_text,
-    parse_single_vehicle_query,
 )
 from data.plugins.astrbot_plugin_wot.src.application.tank_info_service import (
     build_tank_comparison_report,
@@ -150,7 +149,7 @@ async def build_garage_response(input: CommandInput) -> MessageChain:
             player_name, account_id, query.tier, query.tank_type
         )
         image_url = await generate_text_report(
-            input.send_id, "车库查询", text, layout="garage"
+            input.send_id, "车库查询", text, layout="garage", width=2400
         )
         if not image_url:
             raise ValueError("生成车库图片失败")
@@ -162,27 +161,27 @@ async def build_garage_response(input: CommandInput) -> MessageChain:
     return [Comp.At(qq=input.send_id), Comp.Image.fromURL(image_url)]
 
 
-async def build_single_vehicle_response(input: CommandInput) -> MessageChain:
-    """构建玩家单车详情响应。"""
-    query = parse_single_vehicle_query(input.explicit_name)
-    if not query:
-        return [
-            Comp.At(qq=input.send_id),
-            Comp.Plain("请提供坦克名称，例如：单车 59式"),
-        ]
+async def build_career_response(input: CommandInput) -> MessageChain:
+    """构建官网生涯统计响应。"""
     player_name, account_id, err = await resolve_player_account(
-        input.send_id, input.message_chain, query.player_name, input.self_id
+        input.send_id, input.message_chain, input.explicit_name, input.self_id
     )
     if err:
         return _error_chain(input.send_id, err)
     try:
-        text = await build_single_vehicle_text(player_name, account_id, query.tank_name)
-        image_url = await generate_text_report(input.send_id, "单车详情", text)
+        text = await build_career_text(player_name, account_id)
+        image_url = await generate_text_report(
+            input.send_id,
+            f"{player_name} · 生涯统计（标准模式）",
+            text,
+            layout="career",
+            width=2400,
+        )
         if not image_url:
-            raise ValueError("生成单车详情图片失败")
+            raise ValueError("生成生涯统计图片失败")
     except Exception as exc:
         logger.exception(
-            f"单车查询失败 (玩家={player_name}, 坦克={query.tank_name}, 用户={input.send_id}): {exc}"
+            f"生涯统计查询失败 (玩家={player_name}, 用户={input.send_id}): {exc}"
         )
         return _error_chain(input.send_id, "查询失败，请稍后再试")
     return [Comp.At(qq=input.send_id), Comp.Image.fromURL(image_url)]
@@ -193,7 +192,7 @@ async def build_tank_info_response(input: CommandInput) -> MessageChain:
     if not input.explicit_name:
         return [
             Comp.At(qq=input.send_id),
-            Comp.Plain("请提供坦克名称，例如：坦克 59式"),
+            Comp.Plain("请提供坦克名称，例如：坦克信息 59式"),
         ]
     try:
         report = await build_tank_info_report(input.explicit_name)
@@ -217,7 +216,7 @@ async def build_tank_comparison_response(input: CommandInput) -> MessageChain:
     if not input.explicit_name:
         return [
             Comp.At(qq=input.send_id),
-            Comp.Plain("请提供两辆坦克，例如：对比 59式 和 查狄伦 25t"),
+            Comp.Plain("请提供两辆坦克，例如：坦克对比 59式 查狄伦 25t"),
         ]
     try:
         report = await build_tank_comparison_report(input.explicit_name)

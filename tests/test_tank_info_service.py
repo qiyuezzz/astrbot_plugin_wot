@@ -74,12 +74,13 @@ def test_split_comparison_query_supports_names_with_spaces(monkeypatch):
         "59式",
         "查狄伦 25t",
     )
+    assert split_comparison_query("59式和查狄伦 25t") is None
 
 
 def test_build_tank_comparison_text(monkeypatch):
     monkeypatch.setattr(tank_info_service, "find_tanks_by_name", _find)
     monkeypatch.setattr(tank_info_service, "get_tank_full_info", _info)
-    text = build_tank_comparison_text("59式 和 查狄伦 25t")
+    text = build_tank_comparison_text("59式 查狄伦 25t")
     assert "坦克对比：59式 vs 查狄伦 25t" in text
     assert "单发伤害：250 | 390" in text
 
@@ -232,7 +233,7 @@ async def test_build_tank_comparison_report_uses_both_profiles(monkeypatch):
     monkeypatch.setattr(tank_info_service, "find_tanks_by_name", _find)
     monkeypatch.setattr(tank_info_service, "_get_wiki_data", _fake_wiki_data)
 
-    report = await build_tank_comparison_report("59式 和 查狄伦 25t")
+    report = await build_tank_comparison_report("59式 查狄伦 25t")
 
     assert "伤害，HP：250/250/500 | 390/390/500" in report.text
     assert "射击俯角：-7° | -7°" in report.text

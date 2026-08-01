@@ -121,6 +121,73 @@ class WotAccountSearchConfig(BaseConfig):
         }
 
 
+class WotPlayerVehiclesConfig(BaseConfig):
+    """获取官方玩家页面的车辆战绩列表。"""
+
+    base_url = "https://wotgame.cn/wotup/profile/vehicles/list/"
+    warmup_url = "https://wotgame.cn/zh-cn/community/accounts/"
+
+    def build_headers(self):
+        return {
+            "Content-Type": "application/json; charset=utf-8",
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "X-Requested-With": "XMLHttpRequest",
+            "Referer": self.warmup_url,
+            "User-Agent": self.DEFAULT_USER_AGENT,
+        }
+
+
+class WotPlayerSummaryConfig(BaseConfig):
+    """获取官方玩家页面的标准模式总览数据。"""
+
+    base_url = "https://wotgame.cn/wotup/profile/summary/"
+    warmup_url = "https://wotgame.cn/zh-cn/community/accounts/"
+
+    def build_headers(self):
+        return {
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "X-Requested-With": "XMLHttpRequest",
+            "Referer": self.warmup_url,
+            "User-Agent": self.DEFAULT_USER_AGENT,
+        }
+
+
+class WotPlayerStatisticsConfig(BaseConfig):
+    """获取官方玩家页面的等级、国家和坦克类型分布。"""
+
+    base_url = "https://wotgame.cn/wotup/profile/statistics/"
+    warmup_url = "https://wotgame.cn/zh-cn/community/accounts/"
+
+    def build_headers(self):
+        return {
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "X-Requested-With": "XMLHttpRequest",
+            "Referer": self.warmup_url,
+            "User-Agent": self.DEFAULT_USER_AGENT,
+        }
+
+
+class WotPlayerProfileConfig(BaseConfig):
+    """获取官方玩家个人页中内嵌的账号与军团资料。"""
+
+    base_url = "https://wotgame.cn/zh-cn/community/accounts/"
+
+
+class WotPlayerAchievementsConfig(BaseConfig):
+    """获取官方玩家页的战斗勋章摘要。"""
+
+    base_url = "https://wotgame.cn/wotup/profile/achievements/short/"
+    warmup_url = "https://wotgame.cn/zh-cn/community/accounts/"
+
+    def build_headers(self):
+        return {
+            "Accept": "application/json, text/javascript, */*; q=0.01",
+            "X-Requested-With": "XMLHttpRequest",
+            "Referer": self.warmup_url,
+            "User-Agent": self.DEFAULT_USER_AGENT,
+        }
+
+
 # 实例化配置类，主脚本直接用这个实例
 # 盒子接口
 wot_box_config = WotBoxStatsConfig()
@@ -130,3 +197,8 @@ wot_box_detail_record_config = WotBoxDetailRecordConfig()
 # 官网接口
 wot_account_search_config = WotAccountSearchConfig()
 wot_game_tank_info_config = WotGameTankInfoConfig()
+wot_player_vehicles_config = WotPlayerVehiclesConfig()
+wot_player_summary_config = WotPlayerSummaryConfig()
+wot_player_statistics_config = WotPlayerStatisticsConfig()
+wot_player_profile_config = WotPlayerProfileConfig()
+wot_player_achievements_config = WotPlayerAchievementsConfig()

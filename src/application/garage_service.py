@@ -5,7 +5,7 @@ import time
 from dataclasses import dataclass
 
 from astrbot.api import logger
-from data.plugins.astrbot_plugin_wot.src.infrastructure.api_clients.wotbox_camp_api import (
+from data.plugins.astrbot_plugin_wot.src.infrastructure.api_clients.wot_game_api import (
     fetch_garage_all,
 )
 
@@ -14,7 +14,9 @@ _GARAGE_CACHE_MAX_ENTRIES = 128
 _garage_cache: dict[str, tuple[float, str, list[dict], int]] = {}
 _garage_lock = threading.Lock()
 
-_GARAGE_TOP_N = 15
+_GARAGE_TOP_N = 30
+_GARAGE_MIN_TIER = 7
+_GARAGE_MAX_TIER = 11
 
 _TIER_ALIASES = {
     **{f"{tier}级": tier for tier in range(1, 11)},
@@ -48,6 +50,9 @@ _TIER_ALIASES = {
     "VIII级": 8,
     "IX级": 9,
     "X级": 10,
+    "XI": 11,
+    "XI级": 11,
+    "11级": 11,
 }
 
 _TYPE_ALIASES = {
@@ -88,6 +93,8 @@ def parse_garage_query(argument: str | None) -> GarageQuery:
         normalized_tier = _TIER_ALIASES.get(token.upper())
         normalized_type = _TYPE_ALIASES.get(token)
         if normalized_tier is not None:
+            if not _GARAGE_MIN_TIER <= normalized_tier <= _GARAGE_MAX_TIER:
+                return GarageQuery(error="车库仅统计7-11级坦克")
             if tier is not None and tier != normalized_tier:
                 return GarageQuery(error="一次只能筛选一个等级")
             tier = normalized_tier
@@ -128,6 +135,19 @@ def _entry_type(entry: dict) -> str:
     return code_map.get(raw, raw)
 
 
+def _entry_gun_marks(entry: dict) -> int | None:
+    """读取炮管环数，不要将 vehicle_mastery（熟练度徽章）当作环数。"""
+    for key in ("marksOnGun", "marks_on_gun", "gun_marks"):
+        value = entry.get(key)
+        if value in (None, ""):
+            continue
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
 def _format_garage(
     nick_name: str,
     entries: list[dict],
@@ -154,10 +174,13 @@ def _format_garage(
     if filters:
         summary = (
             f"{_clean_name(nick_name)} 的车库{filter_text}（匹配 {len(filtered_entries)} 辆，"
-            f"共 {total} 辆，展示前 {_GARAGE_TOP_N} 辆）"
+            f"共 {total} 辆，统计7-11级，展示前 {_GARAGE_TOP_N} 辆）"
         )
     else:
-        summary = f"{_clean_name(nick_name)} 的车库（共 {total} 辆，展示前 {_GARAGE_TOP_N} 辆）"
+        summary = (
+            f"{_clean_name(nick_name)} 的车库（共 {total} 辆，统计7-11级，"
+            f"展示前 {_GARAGE_TOP_N} 辆）"
+        )
     lines = [summary]
     for index, entry in enumerate(sorted_entries[:_GARAGE_TOP_N], start=1):
         name = _clean_name(entry.get("vehicle_name") or entry.get("name") or "未知")
@@ -165,20 +188,22 @@ def _format_garage(
         vtype = _entry_type(entry)
         battles = int(entry.get("battles") or 0)
         win_rate = entry.get("win_rate") or 0
-        wn8 = float(entry.get("WN8") or 0)
+        avg_frags = float(entry.get("avg_frags") or 0)
         damage_avg = float(entry.get("damage_avg") or 0)
-        marks = int(entry.get("vehicle_mastery") or 0)
-        marks_text = "无环" if marks <= 0 else f"{marks}环"
+        xp_avg = float(entry.get("xp_per_battle_average") or 0)
+        marks = _entry_gun_marks(entry)
+        marks_text = "暂无" if marks is None else "无环" if marks <= 0 else f"{marks}环"
         lines.append(
             f"{index}. {name} {level} {vtype} {battles}场 "
-            f"胜率{win_rate}% WN8 {wn8:.0f} 场均伤害{damage_avg:.0f} {marks_text}"
+            f"胜率{win_rate}% 场均击毁{avg_frags:.2f} "
+            f"场均伤害{damage_avg:.0f} 场均经验{xp_avg:.0f} {marks_text}"
         )
-    lines.append("数据来源：坦克营地")
+    lines.append("数据来源：游戏官网")
     return "\n".join(lines)
 
 
 async def get_garage_data(account_id: str) -> tuple[str, list[dict], int]:
-    """读取并缓存玩家完整车库，供车库列表和单车详情共用。"""
+    """读取并缓存玩家完整车库，供车库列表查询使用。"""
     now = time.time()
     with _garage_lock:
         cached = _garage_cache.get(account_id)

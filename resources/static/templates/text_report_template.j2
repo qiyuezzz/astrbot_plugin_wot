@@ -22,7 +22,7 @@
       box-shadow: 0 16px 48px rgba(26, 42, 68, 0.12);
     }
     .header {
-      padding: {% if layout in ["tank_detail", "tank_compare"] %}24px 36px{% else %}34px 42px{% endif %};
+      padding: 20px 30px;
       color: #ffffff;
       background: linear-gradient(135deg, #5268dc 0%, #704fca 100%);
     }
@@ -220,6 +220,12 @@
       gap: 20px;
       align-items: start;
     }
+    .career-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 20px;
+      align-items: start;
+    }
     .card-column {
       display: flex;
       flex: 1;
@@ -280,16 +286,433 @@
       background: #f1f4f9;
       border-bottom-color: #dfe6ef;
     }
+    .career-chart {
+      display: flex;
+      align-items: flex-end;
+      gap: 14px;
+      min-height: 330px;
+      padding: 18px 20px 20px;
+    }
+    .career-chart-row {
+      display: flex;
+      flex: 1;
+      min-width: 0;
+      flex-direction: column;
+      align-items: center;
+    }
+    .career-chart-label {
+      color: #354258;
+      margin-top: 9px;
+      font-size: 19px;
+      font-weight: 700;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .career-chart-main {
+      display: flex;
+      width: 100%;
+      min-width: 0;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+    }
+    .career-chart-track {
+      display: flex;
+      align-items: flex-end;
+      width: min(72px, 100%);
+      height: 215px;
+      overflow: hidden;
+      border-radius: 10px 10px 4px 4px;
+      background: #e8edf5;
+    }
+    .career-chart-bar {
+      width: 100%;
+      min-height: 2px;
+      border-radius: 10px 10px 4px 4px;
+      background: linear-gradient(90deg, #5268dc, #8a62d3);
+    }
+    .career-chart-value {
+      min-height: 54px;
+      margin-top: 8px;
+      color: #78869a;
+      font-size: 16px;
+      font-weight: 600;
+      line-height: 1.4;
+      text-align: center;
+    }
+    .career-distribution {
+      margin-top: 24px;
+      padding: 26px 30px 30px;
+      border-radius: 18px;
+      color: #eee9d7;
+      background: #202124;
+    }
+    .career-distribution-head {
+      display: flex;
+      gap: 18px;
+      align-items: baseline;
+      margin-bottom: 12px;
+    }
+    .career-distribution-head h2 {
+      margin: 0;
+      font-size: 31px;
+    }
+    .career-distribution-head span {
+      color: #c5bda6;
+      font-size: 22px;
+    }
+    .career-distribution-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 26px;
+    }
+    .career-distribution-card {
+      min-width: 0;
+      border-top: 1px solid rgba(239, 232, 208, 0.12);
+    }
+    .career-distribution-card h3 {
+      margin: 14px 0 0;
+      color: #bdb5a2;
+      font-size: 19px;
+      font-weight: 500;
+      text-align: center;
+    }
+    .career-distribution .career-chart {
+      min-height: 330px;
+      padding: 18px 0 0;
+    }
+    .career-distribution .career-chart-label {
+      color: #eee9d7;
+    }
+    .career-distribution .career-chart-track {
+      background: #34353a;
+    }
+    .career-distribution .career-chart-bar {
+      background: linear-gradient(180deg, #ffb323, #d54820);
+    }
+    .career-distribution .career-chart-value {
+      color: #e8dfc4;
+      font-size: 19px;
+      font-weight: 700;
+    }
+    .career-dashboard {
+      position: relative;
+      margin-bottom: 24px;
+      overflow: hidden;
+      border: 1px solid #343746;
+      border-radius: 20px;
+      color: #f6f1df;
+      background:
+        radial-gradient(circle at 50% 42%, rgba(204, 151, 73, 0.42), transparent 25%),
+        linear-gradient(110deg, #28292f 0%, #3a3036 48%, #202c3f 100%);
+      box-shadow: 0 14px 36px rgba(25, 28, 42, 0.24);
+    }
+    .career-dashboard-head {
+      display: flex;
+      gap: 16px;
+      align-items: baseline;
+      padding: 24px 34px 0;
+    }
+    .career-dashboard-head strong { font-size: 31px; }
+    .career-dashboard-head span {
+      color: #d5cfc2;
+      font-size: 23px;
+      border-bottom: 1px dashed #9b968e;
+    }
+    .career-dashboard-body {
+      display: grid;
+      grid-template-columns: 1fr 1.1fr 1fr;
+      gap: 18px;
+      align-items: center;
+      min-height: 360px;
+      padding: 14px 34px 26px;
+    }
+    .career-dashboard-side {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+      align-items: stretch;
+    }
+    .career-dashboard-item {
+      min-width: 0;
+      padding: 18px 6px;
+      text-align: center;
+    }
+    .career-dashboard-number {
+      color: #f8f5eb;
+      font-size: 34px;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+    .career-dashboard-label {
+      min-height: 58px;
+      margin-top: 10px;
+      color: #d4d0ca;
+      font-size: 21px;
+      line-height: 1.35;
+    }
+    .career-dashboard-rule {
+      width: 36px;
+      height: 2px;
+      margin: 14px auto;
+      background: #8c8989;
+    }
+    .career-dashboard-secondary {
+      color: #d8d3cc;
+      font-size: 19px;
+      white-space: nowrap;
+    }
+    .career-dashboard-center {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 320px;
+      text-align: center;
+    }
+    .career-dashboard-wtr-title {
+      color: #ffe3a0;
+      font-size: 30px;
+      font-weight: 800;
+    }
+    .career-dashboard-crest {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 146px;
+      height: 184px;
+      margin: 14px 0 12px;
+      border: 4px solid #f4d58b;
+      border-radius: 48% 48% 40% 40%;
+      color: #604a26;
+      background: linear-gradient(145deg, #fff9db, #d4ad52 48%, #fff6c8 65%, #b88634);
+      box-shadow: 0 0 26px rgba(255, 211, 116, 0.54), inset 0 0 0 7px rgba(255, 255, 255, 0.42);
+      clip-path: polygon(50% 0, 88% 20%, 94% 72%, 50% 100%, 6% 72%, 12% 20%);
+      font-size: 26px;
+      font-weight: 900;
+    }
+    .career-dashboard-score {
+      color: #ffe4a2;
+      font-size: 46px;
+      font-weight: 900;
+      letter-spacing: 2px;
+    }
+    .career-dashboard-footer {
+      display: flex;
+      justify-content: space-between;
+      padding: 0 34px 22px;
+      color: #ddd7ca;
+      font-size: 21px;
+    }
+
+    /* 官网个人资料页风格：生涯报告使用同一块深色画布，不再套通用白色卡片。 */
+    body.layout-career {
+      padding: 0;
+      color: #e8e3d2;
+      background: #1f2022;
+      font-family: Arial, "Microsoft YaHei", "Noto Sans SC", sans-serif;
+    }
+    .layout-career .report {
+      border: 0;
+      border-radius: 0;
+      background: #1f2022;
+      box-shadow: none;
+    }
+    .layout-career .content { padding: 0 68px 40px; }
+    .career-profile {
+      position: relative;
+      min-height: 255px;
+      margin: 0 -68px 42px;
+      padding: 85px 110px 42px;
+      overflow: hidden;
+      background:
+        linear-gradient(90deg, rgba(13, 14, 16, .87), rgba(18, 19, 22, .68)),
+        url("https://static-cdn.wotgame.cn/static/6.15.1_aca52e/wotp_static/img/core/frontend/scss/common/blocks/parallax/img/profile_bg.jpg") center 35% / cover;
+      border-bottom: 1px solid rgba(255,255,255,.07);
+    }
+    .career-profile-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 60px;
+      max-width: 2180px;
+      margin: 0 auto;
+    }
+    .career-profile-name {
+      margin: 0 0 18px;
+      color: #f1ecdc;
+      font-size: 48px;
+      font-weight: 500;
+      letter-spacing: .5px;
+    }
+    .career-profile-dates {
+      display: flex;
+      gap: 34px;
+      color: #8f8e89;
+      font-size: 22px;
+    }
+    .career-profile-dates strong { color: #c3c0b7; font-weight: 400; }
+    .career-clan { display: flex; align-items: center; gap: 20px; min-width: 380px; }
+    .career-clan img { width: 82px; height: 82px; object-fit: contain; }
+    .career-clan-name { color: #ddd8c8; font-size: 27px; }
+    .career-clan-tag { margin-right: 8px; font-weight: 700; }
+    .career-clan-meta { margin-top: 12px; color: #8f8e89; font-size: 21px; }
+    .career-section-head {
+      display: flex;
+      align-items: baseline;
+      gap: 18px;
+      max-width: 2180px;
+      margin: 0 auto 20px;
+    }
+    .career-section-head h2 { margin: 0; color: #eee8d3; font-size: 39px; font-weight: 600; }
+    .career-section-head span { color: #aaa592; font-size: 22px; border-bottom: 1px dashed #77736a; }
+    .layout-career .career-dashboard {
+      max-width: 2180px;
+      margin: 0 auto;
+      border: 0;
+      border-radius: 0;
+      background:
+        radial-gradient(circle at 50% 46%, rgba(173, 91, 45, .24), transparent 25%),
+        radial-gradient(circle at 87% 45%, rgba(29, 54, 83, .35), transparent 31%),
+        #202124;
+      box-shadow: none;
+    }
+    .layout-career .career-dashboard-body {
+      grid-template-columns: 1fr 430px 1fr;
+      min-height: 390px;
+      padding: 12px 10px 20px;
+    }
+    .layout-career .career-dashboard-side { gap: 0; }
+    .layout-career .career-dashboard-item { padding: 28px 10px 12px; }
+    .career-dashboard-icon { width: 54px; height: 54px; margin-bottom: 10px; opacity: .72; }
+    .layout-career .career-dashboard-number { font-size: 44px; font-weight: 700; }
+    .layout-career .career-dashboard-label { min-height: 70px; color: #aaa9a2; font-size: 25px; }
+    .layout-career .career-dashboard-secondary { color: #c6c2b7; font-size: 23px; }
+    .layout-career .career-dashboard-center { min-height: 360px; }
+    .layout-career .career-dashboard-wtr-title { color: #ffe0a0; font-size: 36px; }
+    .career-wtr-image { width: 230px; height: 230px; margin: 4px 0 -8px; object-fit: contain; filter: drop-shadow(0 0 20px rgba(235,173,83,.42)); }
+    .layout-career .career-dashboard-score { font-size: 60px; }
+    .career-awards {
+      max-width: 2180px;
+      margin: 38px auto 0;
+      padding: 30px 36px 34px;
+      border: 0;
+      background:
+        radial-gradient(circle at 50% 120%, rgba(116, 77, 39, .18), transparent 45%),
+        #252629;
+    }
+    .career-awards-title { margin-bottom: 22px; color: #eee8d3; font-size: 37px; font-weight: 600; }
+    .career-awards-summary { display: flex; justify-content: center; align-items: center; color: #cfc8b2; font-size: 26px; text-align: center; }
+    .career-awards-summary strong { color: #f3ead1; font-size: 34px; }
+    .career-achievements { display: flex; flex-wrap: wrap; justify-content: center; gap: 34px 48px; align-items: end; margin-top: 28px; }
+    .career-achievement { width: 138px; text-align: center; }
+    .career-achievement img { width: 112px; height: 112px; object-fit: contain; filter: drop-shadow(0 6px 10px rgba(0,0,0,.55)); }
+    .career-achievement-name { margin-top: 6px; color: #aaa592; font-size: 19px; white-space: nowrap; }
+    .career-achievement-value { color: #ece5cf; font-size: 23px; font-weight: 700; }
+    .layout-career .career-distribution {
+      max-width: 2180px;
+      margin: 46px auto 0;
+      padding: 0;
+      border-radius: 0;
+      background: transparent;
+    }
+    .layout-career .career-distribution-grid { gap: 52px; }
+    .layout-career .career-distribution-card { border-top: 0; border-bottom: 1px solid rgba(238,232,208,.1); }
+    .layout-career .career-distribution .career-chart { min-height: 350px; padding-top: 38px; }
+    .layout-career .career-chart-track { width: min(44px, 100%); height: 250px; border-radius: 0; background: transparent; }
+    .layout-career .career-chart-track { position: relative; overflow: visible; }
+    .layout-career .career-chart-bar {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      height: var(--bar-height);
+      border-radius: 0;
+      background: linear-gradient(180deg, #ffb323, #cf3f22);
+    }
+    .layout-career .career-chart-value {
+      position: absolute;
+      left: 50%;
+      bottom: calc(var(--bar-height) + 8px);
+      min-height: 0;
+      margin: 0;
+      font-size: 22px;
+      transform: translateX(-50%);
+      white-space: nowrap;
+    }
+    .layout-career .career-chart-label { margin: 10px 0 14px; color: #ddd6c2; font-size: 21px; }
+    .layout-career .career-distribution-card h3 { margin: 10px 0 16px; color: #77766f; font-size: 21px; }
+    .layout-career .career-grid {
+      grid-template-columns: 1fr 1.15fr .9fr .72fr;
+      gap: 0;
+      max-width: 2180px;
+      margin: 48px auto 0;
+      border-top: 1px solid rgba(238,232,208,.1);
+      border-bottom: 1px solid rgba(238,232,208,.1);
+    }
+    .layout-career .data-card {
+      min-height: 100%;
+      padding: 26px 30px 32px;
+      border: 0;
+      border-right: 1px solid rgba(238,232,208,.1);
+      border-radius: 0;
+      background: transparent;
+    }
+    .layout-career .data-card:last-child { border-right: 0; }
+    .layout-career .data-card h2 {
+      padding: 0 0 22px;
+      color: #eee8d3;
+      background: transparent;
+      border: 0;
+      font-size: 29px;
+      font-weight: 500;
+    }
+    .layout-career .card-body { padding: 0; }
+    .layout-career .data-row { padding: 9px 0; color: #b8b4a8; border: 0; font-size: 21px; font-weight: 400; }
+    .layout-career .data-label { color: #8f8e88; font-weight: 400; }
+    .layout-career .data-value { color: #ddd7c5; font-weight: 600; }
+    .layout-career .footer { max-width: 2180px; margin: 22px auto 0; color: #686965; font-size: 20px; }
+    body.layout-help { padding: 34px; background: #e9eef5; }
+    .layout-help .report { border-radius: 22px; }
+    .layout-help .header { padding: 28px 40px; }
+    .layout-help .header h1 { font-size: 56px; }
+    .layout-help .content { padding: 34px; }
+    .help-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 24px;
+      align-items: stretch;
+    }
+    .help-section {
+      margin: 0;
+      padding: 30px 34px;
+      border: 1px solid #d9e1eb;
+      border-radius: 16px;
+      background: #f9fbfd;
+    }
+    .help-section.wide { grid-column: 1 / -1; }
+    .help-section h2 {
+      margin: 0 0 16px;
+      color: #293955;
+      font-size: 36px;
+      line-height: 1.3;
+    }
+    .help-section-body {
+      color: #34435a;
+      font-size: 28px;
+      font-weight: 500;
+      line-height: 1.65;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
   </style>
 </head>
-<body>
+<body class="layout-{{ layout }}">
   <main class="report">
+    {% if layout != "career" %}
     <header class="header">
       <h1>{{ title }}</h1>
-      {% if layout not in ["tank_detail", "tank_compare"] %}
-      <p>坦克世界数据查询</p>
-      {% endif %}
     </header>
+    {% endif %}
     <div class="content">
       {% if table %}
       <p class="summary">{{ table.summary }}</p>
@@ -311,6 +734,120 @@
       <section class="section">{{ notice }}</section>
       {% endfor %}
       <p class="footer">{{ table.footer }}</p>
+      {% elif layout == "career" and cards %}
+      {% set career_cards = cards[1:] if cards[0].dashboard else cards %}
+      {% if cards[0].dashboard %}
+      {% set dashboard = cards[0].dashboard %}
+      {% set profile = dashboard.profile %}
+      <section class="career-profile">
+        <div class="career-profile-inner">
+          <div>
+            <h1 class="career-profile-name">{{ profile.name }}</h1>
+            <div class="career-profile-dates">
+              <span>账号创建于: <strong>{{ profile.registered_at }}</strong></span>
+              <span>最后战斗时间: <strong>{{ profile.last_battle_at }}</strong></span>
+            </div>
+          </div>
+          {% if profile.clan_tag or profile.clan_name %}
+          <div class="career-clan">
+            {% if profile.clan_emblem %}<img src="{{ profile.clan_emblem }}" alt="军团徽章">{% endif %}
+            <div>
+              <div class="career-clan-name"><span class="career-clan-tag" style="color: {{ profile.clan_color }}">[{{ profile.clan_tag }}]</span>{{ profile.clan_name }}</div>
+              <div class="career-clan-meta">职务: {{ profile.clan_role }}　　在军团中的天数: {{ profile.clan_days }}</div>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </section>
+      <div class="career-section-head"><h2>数据</h2></div>
+      <section class="career-dashboard">
+        <div class="career-dashboard-body">
+          <div class="career-dashboard-side">
+            {% for item in dashboard.left %}
+            <div class="career-dashboard-item">
+              <img class="career-dashboard-icon" src="{{ item.icon }}" alt="">
+              <div class="career-dashboard-number">{{ item.primary }}</div>
+              <div class="career-dashboard-label">{{ item.label }}</div>
+              <div class="career-dashboard-rule"></div>
+              <div class="career-dashboard-secondary">{{ item.secondary }}</div>
+            </div>
+            {% endfor %}
+          </div>
+          <div class="career-dashboard-center">
+            <div class="career-dashboard-wtr-title">WTR评级</div>
+            <img class="career-wtr-image" src="{{ dashboard.wtr_icon }}" alt="{{ dashboard.wtr_title }}">
+            <div class="career-dashboard-score">{{ dashboard.wtr_score }}</div>
+          </div>
+          <div class="career-dashboard-side">
+            {% for item in dashboard.right %}
+            <div class="career-dashboard-item">
+              <img class="career-dashboard-icon" src="{{ item.icon }}" alt="">
+              <div class="career-dashboard-number">{{ item.primary }}</div>
+              <div class="career-dashboard-label">{{ item.label }}</div>
+              <div class="career-dashboard-rule"></div>
+              <div class="career-dashboard-secondary">{{ item.secondary }}</div>
+            </div>
+            {% endfor %}
+          </div>
+        </div>
+      </section>
+      <section class="career-awards">
+        <div class="career-awards-title">战斗勋章</div>
+        <div class="career-awards-summary"><strong>{{ dashboard.medals }}</strong></div>
+        {% for card in career_cards if card.achievements %}
+        <div class="career-achievements">
+          {% for row in card.rows %}
+          <div class="career-achievement">
+            <img src="{{ row.icon }}" alt="{{ row.label }}">
+            <div class="career-achievement-name">{{ row.label }}</div>
+            <div class="career-achievement-value">{{ row.value }}</div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </section>
+      {% endif %}
+      <section class="career-distribution">
+        <div class="career-distribution-head">
+          <h2>战斗坦克分布</h2>
+        </div>
+        <div class="career-distribution-grid">
+          {% for card in career_cards if card.chart %}
+          <section class="career-distribution-card">
+            <div class="career-chart">
+              {% for row in card.rows %}
+              <div class="career-chart-row">
+                <div class="career-chart-main">
+                  <div class="career-chart-track" style="--bar-height: {{ row.bar_height }}">
+                    <div class="career-chart-bar"></div>
+                    <div class="career-chart-value">{{ row.value }}</div>
+                  </div>
+                </div>
+                <div class="career-chart-label">{{ row.label }}</div>
+              </div>
+              {% endfor %}
+            </div>
+            <h3>{{ card.title|replace('战斗坦克分布（', '')|replace('）', '') }}</h3>
+          </section>
+          {% endfor %}
+        </div>
+      </section>
+      <div class="career-grid career">
+        {% for card in career_cards if not card.chart and not card.achievements %}
+        <section class="data-card">
+          <h2>{{ card.title }}</h2>
+          <div class="card-body">
+            {% for row in card.rows %}
+            <div class="data-row {{ row.kind }}">
+              {% if row.label %}<span class="data-label">{{ row.label }}</span>{% endif %}
+              <span class="data-value">{{ row.value }}</span>
+            </div>
+            {% endfor %}
+          </div>
+        </section>
+        {% endfor %}
+      </div>
+      {% if card_footer %}<p class="footer">{{ card_footer }}</p>{% endif %}
       {% elif cards %}
       <div class="tank-intro{% if not hero_images %} no-hero{% endif %}">
         {% if hero_images %}
@@ -367,9 +904,21 @@
       </div>
       {% if card_footer %}<p class="footer">{{ card_footer }}</p>{% endif %}
       {% else %}
+      {% if layout == "help" %}
+      <div class="help-grid">
+        {% for section in sections %}
+        {% set help_lines = section.split('\n') %}
+        <section class="help-section{% if loop.first or loop.last %} wide{% endif %}">
+          <h2>{{ help_lines[0] }}</h2>
+          <div class="help-section-body">{{ help_lines[1:]|join('\n') }}</div>
+        </section>
+        {% endfor %}
+      </div>
+      {% else %}
       {% for section in sections %}
       <section class="section">{{ section }}</section>
       {% endfor %}
+      {% endif %}
       {% endif %}
     </div>
   </main>

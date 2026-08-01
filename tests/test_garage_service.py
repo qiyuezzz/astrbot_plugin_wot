@@ -7,15 +7,16 @@ from data.plugins.astrbot_plugin_wot.src.application.garage_service import (
 )
 
 
-def _entry(name: str, battles: int, wn8: float, win_rate: float) -> dict:
+def _entry(name: str, battles: int, win_rate: float) -> dict:
     return {
         "vehicle_name": name,
         "vlevel": "X",
         "vtype": "中型坦克",
         "battles": battles,
         "win_rate": win_rate,
-        "WN8": wn8,
+        "avg_frags": 0.53,
         "damage_avg": 2500.0,
+        "xp_per_battle_average": 771,
         "vehicle_mastery": 2,
     }
 
@@ -23,9 +24,9 @@ def _entry(name: str, battles: int, wn8: float, win_rate: float) -> dict:
 @pytest.mark.asyncio
 async def test_build_garage_text_formats_top_tanks(monkeypatch):
     entries = [
-        _entry("“豹”I", 58, 2235.02, 56.9),
-        _entry('"战鳄"', 22, 1979.3, 63.64),
-        _entry("DBV-152", 117, 2090.48, 60.68),
+        _entry("“豹”I", 58, 56.9),
+        _entry('"战鳄"', 22, 63.64),
+        _entry("DBV-152", 117, 60.68),
     ]
 
     async def _fake_fetch(*_args, **_kwargs):
@@ -38,8 +39,13 @@ async def test_build_garage_text_formats_top_tanks(monkeypatch):
     assert "共 173 辆" in text
     assert "1. DBV-152" in text
     assert "胜率60.68%" in text
-    assert "WN8 2090" in text
-    assert "2环" in text
+    assert "场均击毁0.53" in text
+    assert "场均伤害2500" in text
+    assert "场均经验771" in text
+    assert "WN8" not in text
+    assert "数据来源：游戏官网" in text
+    assert "暂无" in text
+    assert "1环" not in text
     assert "豹I" in text
     assert "“豹”I" not in text
     garage_service._garage_cache.clear()
@@ -73,12 +79,28 @@ def test_parse_garage_query_accepts_filter_only():
     assert query.tank_type == "中坦"
 
 
+def test_parse_garage_query_limits_garage_tiers_to_seven_through_eleven():
+    assert parse_garage_query("XI级").tier == 11
+    assert parse_garage_query("6级").error == "车库仅统计7-11级坦克"
+
+
+def test_format_garage_uses_gun_marks_field():
+    text = garage_service._format_garage(
+        "玩家",
+        [{**_entry("有环坦克", 10, 50), "vehicle_mastery": 1, "marksOnGun": 3}],
+        1,
+    )
+
+    assert "3环" in text
+    assert "1环" not in text
+
+
 @pytest.mark.asyncio
 async def test_build_garage_text_filters_by_tier_and_type(monkeypatch):
     entries = [
-        _entry("十级中坦", 100, 2000, 55),
-        {**_entry("十级重坦", 80, 1900, 54), "vtype": "重型坦克"},
-        {**_entry("八级中坦", 60, 1800, 53), "vlevel": "VIII"},
+        _entry("十级中坦", 100, 55),
+        {**_entry("十级重坦", 80, 54), "vtype": "重型坦克"},
+        {**_entry("八级中坦", 60, 53), "vlevel": "VIII"},
     ]
 
     async def _fake_fetch(*_args, **_kwargs):
