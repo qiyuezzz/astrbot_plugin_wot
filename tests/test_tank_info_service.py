@@ -242,3 +242,27 @@ async def test_build_tank_comparison_report_uses_both_profiles(monkeypatch):
     assert "起火几率，%：12 | 12" in mobility_text
     assert "【模块配置" not in report.text
     assert len(report.hero_images) == 2
+
+
+@pytest.mark.asyncio
+async def test_partial_wiki_result_is_not_cached(monkeypatch):
+    calls = {"summary": 0, "profile": 0}
+
+    async def _summary(_tank_id):
+        calls["summary"] += 1
+        return {"tanke_image": "https://example.com/tank.png"}
+
+    async def _profile_failure(_tank_id):
+        calls["profile"] += 1
+        raise RuntimeError("temporary failure")
+
+    monkeypatch.setattr(tank_info_service, "fetch_tank_wiki_summary", _summary)
+    monkeypatch.setattr(tank_info_service, "fetch_tank_wiki_profile", _profile_failure)
+    tank_info_service._wiki_cache.clear()
+    tank = _tank("59式", 49)
+
+    await tank_info_service._get_wiki_data(tank)
+    await tank_info_service._get_wiki_data(tank)
+
+    assert calls == {"summary": 2, "profile": 2}
+    assert 49 not in tank_info_service._wiki_cache

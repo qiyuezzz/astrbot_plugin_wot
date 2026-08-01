@@ -56,22 +56,22 @@ async def _paginated_fetch(
                 await asyncio.sleep(0.2)
                 continue
 
-            page_has_new = False
+            page_has_unseen = False
             for record in page_records:
                 if record.arena_id in seen_arena_ids:
                     continue
+                seen_arena_ids.add(record.arena_id)
+                page_has_unseen = True
                 if should_stop and should_stop(record):
                     return all_records
                 if not should_include(record):
                     continue
 
-                seen_arena_ids.add(record.arena_id)
                 all_records.append(record)
-                page_has_new = True
                 if limit is not None and len(all_records) >= limit:
                     return all_records[:limit]
 
-            if not page_has_new:
+            if not page_has_unseen:
                 break
             page += 1
             await asyncio.sleep(0.2)

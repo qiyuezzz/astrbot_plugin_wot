@@ -2,8 +2,26 @@ import pytest
 
 from data.plugins.astrbot_plugin_wot.src.application import career_service
 from data.plugins.astrbot_plugin_wot.src.application.career_service import (
+    _wtr_title,
     build_career_text,
 )
+
+
+@pytest.mark.parametrize(
+    ("score", "expected"),
+    [
+        (6199, "王牌I"),
+        (6200, "王牌II"),
+        (7299, "王牌II"),
+        (7300, "王牌III"),
+        (7999, "王牌III"),
+        (8000, "传奇I"),
+        (8800, "传奇II"),
+        (9900, "传奇III"),
+    ],
+)
+def test_wtr_title_boundaries(score, expected):
+    assert _wtr_title(score) == expected
 
 
 @pytest.mark.asyncio

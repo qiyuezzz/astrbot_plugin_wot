@@ -3,6 +3,7 @@ import pytest
 from data.plugins.astrbot_plugin_wot.src.application import binding_service
 from data.plugins.astrbot_plugin_wot.src.application.binding_service import (
     player_exists,
+    search_account_candidates,
 )
 
 
@@ -27,7 +28,11 @@ async def test_player_exists_caches_result(monkeypatch):
 
     class _FakeResponse:
         async def json(self):
-            return {"response": [{"account_name": "Tester"}]}
+            return {
+                "response": [
+                    {"account_id": "1", "account_name": "Tester"}
+                ]
+            }
 
     async def _fake_search(_player_name: str):
         calls["count"] += 1
@@ -43,12 +48,75 @@ async def test_player_exists_caches_result(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_player_exists_requires_exact_search_result(monkeypatch):
+    class _FakeResponse:
+        status = 200
+
+        async def json(self):
+            return {
+                "response": [
+                    {
+                        "account_id": "1",
+                        "account_name": "Tester_One",
+                        "account_battles": 10,
+                    }
+                ]
+            }
+
+    async def _fake_search(_name):
+        return _FakeResponse()
+
+    monkeypatch.setattr(binding_service, "fetch_account_search", _fake_search)
+    binding_service._player_exists_cache.clear()
+
+    assert await player_exists("Tester") is False
+    binding_service._player_exists_cache.clear()
+
+
+@pytest.mark.asyncio
+async def test_search_account_candidates_returns_all_fuzzy_results(monkeypatch):
+    class _FakeResponse:
+        status = 200
+
+        async def json(self):
+            return {
+                "response": [
+                    {
+                        "account_id": "1",
+                        "account_name": "Tester_One",
+                        "account_battles": 10,
+                    },
+                    {
+                        "account_id": "2",
+                        "account_name": "Tester_Two",
+                        "account_battles": 20,
+                    },
+                ]
+            }
+
+    async def _fake_search(_name):
+        return _FakeResponse()
+
+    monkeypatch.setattr(binding_service, "fetch_account_search", _fake_search)
+
+    candidates = await search_account_candidates("Tester")
+
+    assert [candidate.account_name for candidate in candidates] == [
+        "Tester_One",
+        "Tester_Two",
+    ]
+
+@pytest.mark.asyncio
 async def test_player_exists_retries_after_cache_ttl_expiry(monkeypatch):
     calls = {"count": 0}
 
     class _FakeResponse:
         async def json(self):
-            return {"response": [{"account_name": "Tester"}]}
+            return {
+                "response": [
+                    {"account_id": "1", "account_name": "Tester"}
+                ]
+            }
 
     async def _fake_search(_player_name: str):
         calls["count"] += 1

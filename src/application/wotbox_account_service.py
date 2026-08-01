@@ -35,13 +35,16 @@ async def search_player_account(player_name: str) -> AccountLookup | None:
             return cached[1]
 
     users = await fetch_user_search(player_name)
-    if not users:
-        result = None
-    else:
-        exact = next(
-            (user for user in users if user.get("nickname") == player_name),
-            users[0],
-        )
+    normalized_name = player_name.casefold()
+    exact = next(
+        (
+            user
+            for user in users
+            if str(user.get("nickname") or "").casefold() == normalized_name
+        ),
+        None,
+    )
+    if exact is not None:
         result = AccountLookup(
             player_name=str(exact.get("nickname") or player_name),
             account_id=str(exact.get("account_id") or ""),
@@ -49,6 +52,8 @@ async def search_player_account(player_name: str) -> AccountLookup | None:
         if not result.account_id:
             logger.warning(f"坦克营地搜索结果缺少 account_id: {exact}")
             result = None
+    else:
+        result = None
 
     with _search_lock:
         if len(_search_cache) >= _SEARCH_CACHE_MAX_ENTRIES:

@@ -23,6 +23,7 @@ from data.plugins.astrbot_plugin_wot.src.application.query_service import (
     build_tank_comparison_response,
     build_tank_info_response,
 )
+from data.plugins.astrbot_plugin_wot.src.domain.player import AccountInfo
 from data.plugins.astrbot_plugin_wot.src.domain.report import PlayerStats
 from data.plugins.astrbot_plugin_wot.src.application.tank_info_service import TankReport
 
@@ -94,6 +95,60 @@ def test_plugin_module_can_load():
 
 
 @pytest.mark.asyncio
+async def test_bind_command_prompts_for_multiple_players_and_binds_selection(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    candidates = [
+        AccountInfo("1", "Tester_One", 100, "A"),
+        AccountInfo("2", "Tester_Two", 200, "B"),
+    ]
+    selection_event = DummyEvent("10001", "2", [Comp.Plain("2")])
+    controller = MagicMock()
+
+    def fake_session_waiter(*, timeout):
+        assert timeout == 60
+
+        def decorator(handler):
+            async def wrapper(event, session_filter=None):
+                await handler(controller, selection_event)
+
+            return wrapper
+
+        return decorator
+
+    monkeypatch.setattr(
+        plugin_main,
+        "search_account_candidates",
+        AsyncMock(return_value=candidates),
+    )
+    bind_account = AsyncMock(return_value=candidates[1])
+    monkeypatch.setattr(plugin_main, "bind_account", bind_account)
+    monkeypatch.setattr(plugin_main, "session_waiter", fake_session_waiter)
+
+    plugin = MyPlugin(context=MagicMock())
+    event = DummyEvent(
+        sender_id="10001",
+        message_str="/wot绑定 Tester",
+        messages=[Comp.Plain("/wot绑定 Tester")],
+    )
+
+    results = [item async for item in plugin.wot_bind_player_name(event)]
+
+    assert len(results) == 1
+    assert "匹配到多个结果" in results[0]["plain"]
+    assert "Tester_One" in results[0]["plain"]
+    assert "Tester_Two" in results[0]["plain"]
+    bind_account.assert_awaited_once_with("10001", candidates[1])
+    assert event.sent == [
+        {
+            "plain": '绑定成功，玩家名称为"Tester_Two"\n军团:"B"\n玩家id:"2"'
+        }
+    ]
+    assert event.stopped is True
+    controller.stop.assert_called_once_with()
+
+
+@pytest.mark.asyncio
 async def test_plugin_initialize_starts_scheduler_and_syncs_tanks(
     monkeypatch: pytest.MonkeyPatch,
 ):
@@ -116,7 +171,7 @@ async def test_plugin_initialize_starts_scheduler_and_syncs_tanks(
     )
 
     class _MissingPath:
-        def exists(self):
+        def is_file(self):
             return False
 
     monkeypatch.setattr(
@@ -132,6 +187,7 @@ async def test_plugin_initialize_starts_scheduler_and_syncs_tanks(
 @pytest.mark.asyncio
 async def test_plugin_initialize_skips_sync_when_tank_data_exists(
     monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
 ):
     called = {"synced": False}
 
@@ -148,17 +204,52 @@ async def test_plugin_initialize_skips_sync_when_tank_data_exists(
         _fake_sync_all_tank_info,
     )
 
-    class _ExistingPath:
-        def exists(self):
-            return True
+    tank_info_path = tmp_path / "wot_tanks_full.json"
+    tank_info_path.write_text(
+        '{"59式": {"name": "59式", "vehicle_cd": 49}}', encoding="utf-8"
+    )
 
     monkeypatch.setattr(
         "data.plugins.astrbot_plugin_wot.main.prepare_tank_info_path",
-        lambda: _ExistingPath(),
+        lambda: tank_info_path,
     )
     plugin = MyPlugin(context=MagicMock())
     await plugin.initialize()
     assert called["synced"] is False
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("content", ["", "{}", "not-json"])
+async def test_plugin_initialize_syncs_when_tank_data_file_is_invalid(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path,
+    content: str,
+):
+    called = {"synced": False}
+
+    monkeypatch.setattr(
+        "data.plugins.astrbot_plugin_wot.main.start_timer_thread", lambda: None
+    )
+
+    async def _fake_sync_all_tank_info():
+        called["synced"] = True
+        return "ok"
+
+    monkeypatch.setattr(
+        "data.plugins.astrbot_plugin_wot.main.sync_all_tank_info",
+        _fake_sync_all_tank_info,
+    )
+    tank_info_path = tmp_path / "wot_tanks_full.json"
+    tank_info_path.write_text(content, encoding="utf-8")
+    monkeypatch.setattr(
+        "data.plugins.astrbot_plugin_wot.main.prepare_tank_info_path",
+        lambda: tank_info_path,
+    )
+
+    plugin = MyPlugin(context=MagicMock())
+    await plugin.initialize()
+
+    assert called["synced"] is True
 
 
 @pytest.mark.asyncio
@@ -733,8 +824,7 @@ async def test_tank_selection_only_prompts_once_for_invalid_choices(
         "plain": "请输入列表中的编号，或回复“取消”退出。"
     }
     assert waiting_events[1].sent == []
-    assert controller.keep.call_count == 2
-    controller.keep.assert_called_with(timeout=60, reset_timeout=False)
+    controller.keep.assert_not_called()
 
 
 @pytest.mark.asyncio

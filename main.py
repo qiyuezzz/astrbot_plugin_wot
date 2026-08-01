@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import re
 from pathlib import Path
 
@@ -10,7 +11,12 @@ from astrbot.api.star import Context, Star, register
 from astrbot.core.utils.session_waiter import SessionController, SessionFilter, session_waiter
 from data.plugins.astrbot_plugin_wot.src.application.message_parser import (
     CommandInput,
+    extract_player_name,
     extract_text_after_leading_at,
+)
+from data.plugins.astrbot_plugin_wot.src.application.binding_service import (
+    bind_account,
+    search_account_candidates,
 )
 from data.plugins.astrbot_plugin_wot.src.application.query_service import (
     build_career_response,
@@ -23,7 +29,6 @@ from data.plugins.astrbot_plugin_wot.src.application.query_service import (
     find_tank_comparison_candidates,
     find_tank_info_candidates,
     format_tank_info_candidates,
-    handle_bind_command,
 )
 from data.plugins.astrbot_plugin_wot.src.application.report.report_service import (
     REPORT_CONFIGS,
@@ -38,7 +43,9 @@ from data.plugins.astrbot_plugin_wot.src.application.tank_sync_service import (
 from data.plugins.astrbot_plugin_wot.src.infrastructure.network.http_client import (
     close_shared_session,
 )
+from data.plugins.astrbot_plugin_wot.src.domain.player import AccountInfo
 from data.plugins.astrbot_plugin_wot.src.domain.report import Tank
+from data.plugins.astrbot_plugin_wot.src.settings.message import WotBindMsg
 from data.plugins.astrbot_plugin_wot.src.settings.storage import (
     prepare_tank_info_path,
 )
@@ -91,7 +98,6 @@ async def _wait_for_tank_selection(
                         )
                     )
                     invalid_prompt_sent = True
-                controller.keep(timeout=60, reset_timeout=False)
                 return
             index = int(choice) - 1
             if not 0 <= index < len(candidates):
@@ -102,7 +108,6 @@ async def _wait_for_tank_selection(
                         )
                     )
                     invalid_prompt_sent = True
-                controller.keep(timeout=60, reset_timeout=False)
                 return
             selected.append(candidates[index])
             controller.stop()
@@ -113,6 +118,69 @@ async def _wait_for_tank_selection(
         await _selection_waiter(event, session_filter=_TankSelectionSessionFilter())
     except TimeoutError:
         await event.send(event.plain_result("选择已超时，请重新输入坦克名称查询。"))
+    return selected[0] if selected else None
+
+
+def _format_account_candidates(
+    player_name: str, candidates: list[AccountInfo]
+) -> str:
+    lines = [f"玩家名称「{player_name}」匹配到多个结果，请回复编号选择："]
+    for index, account in enumerate(candidates, start=1):
+        clan = account.clan_tag or "无"
+        lines.append(
+            f"{index}. {account.account_name}（军团：{clan} · "
+            f"战斗：{account.account_battles:,} · ID：{account.account_id}）"
+        )
+    lines.append("回复编号完成绑定，回复“取消”退出（60秒内有效）")
+    return "\n".join(lines)
+
+
+async def _wait_for_account_selection(
+    event: AstrMessageEvent, candidates: list[AccountInfo]
+) -> AccountInfo | None:
+    selected: list[AccountInfo] = []
+    invalid_prompt_sent = False
+
+    @session_waiter(timeout=60)
+    async def _selection_waiter(
+        controller: SessionController,
+        waiting_event: AstrMessageEvent,
+    ) -> None:
+        nonlocal invalid_prompt_sent
+        try:
+            choice = waiting_event.message_str.strip().lstrip("/").strip()
+            if choice in {"取消", "退出"}:
+                await waiting_event.send(waiting_event.plain_result("已取消玩家绑定。"))
+                controller.stop()
+                return
+            if not choice.isdigit():
+                if not invalid_prompt_sent:
+                    await waiting_event.send(
+                        waiting_event.plain_result(
+                            "请输入列表中的编号，或回复“取消”退出。"
+                        )
+                    )
+                    invalid_prompt_sent = True
+                return
+            index = int(choice) - 1
+            if not 0 <= index < len(candidates):
+                if not invalid_prompt_sent:
+                    await waiting_event.send(
+                        waiting_event.plain_result(
+                            f"编号无效，请输入 1-{len(candidates)}，或回复“取消”退出。"
+                        )
+                    )
+                    invalid_prompt_sent = True
+                return
+            selected.append(candidates[index])
+            controller.stop()
+        finally:
+            waiting_event.stop_event()
+
+    try:
+        await _selection_waiter(event, session_filter=_TankSelectionSessionFilter())
+    except TimeoutError:
+        await event.send(event.plain_result("选择已超时，请重新输入玩家名称绑定。"))
     return selected[0] if selected else None
 
 
@@ -128,6 +196,21 @@ def _load_plugin_version() -> str:
     except OSError:
         pass
     return "v0.0.0"
+
+
+def _has_valid_tank_info(path: Path) -> bool:
+    """判断坦克库是否为可用于查询的非空 JSON 文件。"""
+    try:
+        if not path.is_file():
+            return False
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+
+    return isinstance(data, dict) and any(
+        isinstance(payload, dict) and payload.get("name")
+        for payload in data.values()
+    )
 
 
 def _make_report_handler(config, plugin_instance):
@@ -167,8 +250,9 @@ class MyPlugin(Star):
     async def initialize(self):
         """插件初始化：启动定时任务；首次使用（无坦克数据文件）时同步坦克数据"""
         start_timer_thread()
-        if prepare_tank_info_path().exists():
-            logger.info("坦克数据文件已存在，跳过启动同步，由每日定时任务更新")
+        tank_info_path = prepare_tank_info_path()
+        if _has_valid_tank_info(tank_info_path):
+            logger.info("坦克数据文件有效，跳过启动同步，由每日定时任务更新")
             return
         try:
             result = await sync_all_tank_info()
@@ -222,8 +306,35 @@ class MyPlugin(Star):
     @filter.command("wot绑定")
     async def wot_bind_player_name(self, event: AstrMessageEvent):
         """绑定玩家游戏名称"""
-        result = await handle_bind_command(event)
-        yield result
+        player_name = extract_player_name(event.message_str)
+        if not player_name:
+            yield event.plain_result(WotBindMsg.invalid())
+            return
+
+        candidates = await search_account_candidates(player_name)
+        if not candidates:
+            yield event.plain_result(WotBindMsg.fail(player_name))
+            return
+
+        if len(candidates) > 1:
+            yield event.plain_result(_format_account_candidates(player_name, candidates))
+            selected = await _wait_for_account_selection(event, candidates)
+            if selected:
+                try:
+                    account = await bind_account(event.get_sender_id(), selected)
+                    await event.send(event.plain_result(WotBindMsg.success(account)))
+                except Exception as exc:
+                    logger.exception(f"写入玩家绑定失败 (用户={event.get_sender_id()}): {exc}")
+                    await event.send(event.plain_result("绑定失败，请稍后再试。"))
+            event.stop_event()
+            return
+
+        try:
+            account = await bind_account(event.get_sender_id(), candidates[0])
+            yield event.plain_result(WotBindMsg.success(account))
+        except Exception as exc:
+            logger.exception(f"写入玩家绑定失败 (用户={event.get_sender_id()}): {exc}")
+            yield event.plain_result("绑定失败，请稍后再试。")
 
     @filter.command("效率", alias={"盒子效率"})
     async def query_basic_efficiency(
@@ -407,7 +518,7 @@ class MyPlugin(Star):
             "省略玩家名称时使用已绑定玩家；命令支持带 / 和不带 / 两种方式。\n"
             "官方 QQ 机器人需要先 @机器人，再输入命令。\n\n"
             "玩家查询\n"
-            "wot绑定 玩家名称：绑定当前 QQ 账号\n"
+            "wot绑定 玩家名称：绑定当前 QQ 账号；匹配到多个玩家时回复编号选择\n"
             "效率 / 盒子效率 [玩家名称]：查询基础效率\n"
             "坦克生涯 [玩家名称]：查询官网生涯数据与坦克分布\n"
             "示例：效率、效率 玩家名称、坦克生涯 玩家名称\n\n"

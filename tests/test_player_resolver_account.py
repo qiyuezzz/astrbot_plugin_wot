@@ -8,6 +8,7 @@ from data.plugins.astrbot_plugin_wot.src.application.player_resolver import (
 from data.plugins.astrbot_plugin_wot.src.application.wotbox_account_service import (
     AccountLookup,
 )
+from data.plugins.astrbot_plugin_wot.src.application import wotbox_account_service
 
 
 @pytest.mark.asyncio
@@ -74,3 +75,15 @@ async def test_resolve_player_account_self_unbound(monkeypatch):
     monkeypatch.setattr(player_resolver, "read_binding_info", lambda _sid: None)
     name, account_id, err = await resolve_player_account("10001", [], None)
     assert (name, account_id, err) == (None, None, "self_unbound")
+
+
+@pytest.mark.asyncio
+async def test_wotbox_search_does_not_fall_back_to_first_fuzzy_result(monkeypatch):
+    async def _fake_search(_name):
+        return [{"nickname": "Tester_One", "account_id": "123"}]
+
+    monkeypatch.setattr(wotbox_account_service, "fetch_user_search", _fake_search)
+    wotbox_account_service._search_cache.clear()
+
+    assert await wotbox_account_service.search_player_account("Tester") is None
+    wotbox_account_service._search_cache.clear()

@@ -146,7 +146,8 @@ async def _get_wiki_data(tank: Tank) -> tuple[dict, dict]:
     if isinstance(profile_result, Exception):
         logger.warning(f"坦克百科详情查询失败 (tank_id={tank.vehicle_cd}): {profile_result}")
 
-    if summary or profile:
+    # 部分成功通常只是瞬时网络故障，不将缺失的一半长期缓存。
+    if summary and profile:
         with _wiki_cache_lock:
             _wiki_cache[tank.vehicle_cd] = (time.time(), summary, profile)
     return summary, profile
