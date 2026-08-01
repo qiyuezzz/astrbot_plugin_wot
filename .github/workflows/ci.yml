@@ -35,5 +35,6 @@ jobs:
       - name: Run tests
         working-directory: AstrBot
         run: |
+          mkdir -p data/plugins
           cp -r ../plugin data/plugins/astrbot_plugin_wot
           python -m pytest data/plugins/astrbot_plugin_wot/tests -q
